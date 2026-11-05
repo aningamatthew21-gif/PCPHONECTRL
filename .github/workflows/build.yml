@@ -29,11 +29,18 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -o publish
 
-      - name: Upload exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: PhoneCtrl-win-x64
-          path: publish/PhoneCtrl.exe
+      # Release assets don't count against the Actions artifact storage quota.
+      - name: Publish "latest build" download
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive -Path publish/PhoneCtrl.exe -DestinationPath PhoneCtrl-win-x64.zip
+          gh release delete latest-build --cleanup-tag --yes 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create latest-build PhoneCtrl-win-x64.zip --prerelease --target $env:GITHUB_SHA `
+            --title "Latest build ($env:GITHUB_REF_NAME)" `
+            --notes "Automatic build of commit $env:GITHUB_SHA. Download PhoneCtrl-win-x64.zip, extract, run PhoneCtrl.exe."
 
       - name: Zip for release
         if: startsWith(github.ref, 'refs/tags/v')

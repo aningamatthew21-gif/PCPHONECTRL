@@ -29,9 +29,8 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 
 ## Install
 
-1. Open the repository's **Actions** tab on GitHub → the latest green **Build PhoneCtrl (Windows)** run →
-   download **PhoneCtrl-win-x64** under *Artifacts* → extract `PhoneCtrl.exe`.
-   (Tagged versions are also on the **Releases** page.)
+1. Open the repository's **Releases** page on GitHub → **Latest build** → under *Assets* download
+   **PhoneCtrl-win-x64.zip** → right-click → **Extract All…**
 2. Put `PhoneCtrl.exe` anywhere (for example `Documents\PhoneCtrl`) and double-click it.
    Windows SmartScreen may warn because the exe is unsigned: **More info → Run anyway**.
 
