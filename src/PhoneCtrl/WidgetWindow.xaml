@@ -1,0 +1,125 @@
+<Window x:Class="PhoneCtrl.WidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PhoneCtrl"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave">
+
+    <Window.Resources>
+        <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#8C8C8C" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="4,8,0,4" />
+        </Style>
+
+        <Style x:Key="PadButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C2C2C" />
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3D3D3D" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#0078D4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LockButton" TargetType="Button" BasedOn="{StaticResource PadButton}">
+            <Setter Property="Background" Value="#B3261E" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#D93025" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#7F1D17" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Collapsed: a slim tab on the screen edge. Hover to open, drag to move. -->
+        <Border x:Name="Handle" Width="16" Height="80" CornerRadius="8"
+                Background="#E61E1E1E" BorderBrush="#40FFFFFF" BorderThickness="1"
+                MouseLeftButtonDown="OnDragStart" ToolTip="PhoneCtrl - hover to open, drag to move">
+            <Ellipse x:Name="HandleDot" Width="7" Height="7" Fill="#8A8A8A" />
+        </Border>
+
+        <!-- Expanded panel -->
+        <Border x:Name="ExpandedPanel" Visibility="Collapsed" Width="184" CornerRadius="16" Padding="8"
+                Background="#F21B1B1B" BorderBrush="#40FFFFFF" BorderThickness="1">
+            <StackPanel>
+                <DockPanel Background="Transparent" Margin="4,2,0,0" MouseLeftButtonDown="OnDragStart"
+                           Cursor="SizeAll" ToolTip="Drag to move">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PadButton}" Width="28" Height="28"
+                            FontSize="12" Margin="0" Tag="CenterPointer" Click="OnAction" Content="&#xE7C9;"
+                            ToolTip="Move the phone's pointer to the middle of the screen" />
+                    <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#8A8A8A" VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusText" Text="Starting…" Foreground="#DDDDDD" FontSize="12"
+                               Margin="8,0,4,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+
+                <TextBlock Text="MUSIC" Style="{StaticResource SectionLabel}" />
+                <UniformGrid Columns="3">
+                    <Button Style="{StaticResource PadButton}" Tag="PreviousTrack" Click="OnAction" Content="&#xE892;" ToolTip="Previous song" />
+                    <Button Style="{StaticResource PadButton}" Tag="PlayPause" Click="OnAction" Content="&#xE768;" ToolTip="Play / pause" />
+                    <Button Style="{StaticResource PadButton}" Tag="NextTrack" Click="OnAction" Content="&#xE893;" ToolTip="Next song" />
+                </UniformGrid>
+
+                <TextBlock Text="VOLUME" Style="{StaticResource SectionLabel}" />
+                <UniformGrid Columns="2">
+                    <Button Style="{StaticResource PadButton}" Tag="VolumeDown" Click="OnAction" Content="&#xE993;" ToolTip="Volume down" />
+                    <Button Style="{StaticResource PadButton}" Tag="VolumeUp" Click="OnAction" Content="&#xE995;" ToolTip="Volume up" />
+                </UniformGrid>
+
+                <TextBlock Text="TIKTOK / REELS" Style="{StaticResource SectionLabel}" />
+                <UniformGrid Columns="2">
+                    <Button Style="{StaticResource PadButton}" Tag="PreviousVideo" Click="OnAction" Content="&#xE70E;" ToolTip="Previous video (scroll up)" />
+                    <Button Style="{StaticResource PadButton}" Tag="NextVideo" Click="OnAction" Content="&#xE70D;" ToolTip="Next video (scroll down)" />
+                </UniformGrid>
+
+                <Button Style="{StaticResource LockButton}" Tag="Lock" Click="OnAction" Margin="3,12,3,3"
+                        ToolTip="Lock the phone (screen goes black)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE72E;" FontSize="15" VerticalAlignment="Center" />
+                        <TextBlock Text="Lock phone" FontFamily="Segoe UI" FontSize="13" FontWeight="SemiBold"
+                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <TextBlock x:Name="HotkeyHint" Foreground="#6E6E6E" FontSize="10" Margin="4,6,4,2" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
