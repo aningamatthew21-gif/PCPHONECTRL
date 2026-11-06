@@ -26,8 +26,17 @@ namespace PhoneCtrl
             menu.Items.Add("Open log folder", null, (_, _) => App.OpenInShell(Log.Folder));
             menu.Items.Add("Check for updates", null, async (_, _) => await _app.CheckForUpdatesAsync(userAsked: true));
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Exit", null, (_, _) => _app.Quit());
-            menu.Opening += (_, _) => toggle.Text = _app.WidgetVisible ? "Hide widget" : "Show widget";
+            var autostart = new ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
+            autostart.Click += (_, _) => _app.StartsWithWindows = autostart.Checked;
+            menu.Items.Add(autostart);
+            menu.Items.Add("Add desktop shortcut", null, (_, _) => _app.CreateDesktopShortcut());
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Exit PhoneCtrl", null, (_, _) => _app.Quit());
+            menu.Opening += (_, _) =>
+            {
+                toggle.Text = _app.WidgetVisible ? "Hide widget" : "Show widget";
+                autostart.Checked = _app.StartsWithWindows;
+            };
 
             _icon = new NotifyIcon
             {

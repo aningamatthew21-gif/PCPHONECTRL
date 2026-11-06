@@ -37,10 +37,26 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 
 ## Updates
 
-PhoneCtrl checks GitHub for a new version when it starts and every 4 hours. When one is ready,
-a green dot appears on the widget tab, a notification pops up, and a green **⬇ Update to vX** button
-appears in the panel. Click it and the app downloads the new version, swaps it in, and restarts.
-You can also use tray icon → **Check for updates**. This requires the GitHub repository to be public.
+The bottom of the widget panel has an update button:
+
+* **Grey "Check for updates"**: click it and the icon spins while PhoneCtrl asks GitHub.
+* **Blue "Update to vX"**: a new version is ready. Click it and the app downloads the new version,
+  swaps it in, and restarts by itself.
+* "You're up to date" means you already have the newest version.
+
+PhoneCtrl also checks by itself when it starts and every 4 hours. When it finds an update, the button
+turns blue, a green dot appears on the widget tab, and a notification pops up.
+(This requires the GitHub repository to be public.)
+
+## Opening and closing PhoneCtrl
+
+PhoneCtrl is a single file, `PhoneCtrl.exe`, with no installer.
+
+* **Open:** double-click `PhoneCtrl.exe` (or the desktop shortcut, see below).
+* **Close:** right-click the widget → **Exit PhoneCtrl**, or right-click the PhoneCtrl icon near the clock
+  (click **^** if it's hidden) → **Exit PhoneCtrl**.
+* **Desktop shortcut:** tray icon → **Add desktop shortcut**.
+* **Open automatically when Windows starts:** tray icon → **Start with Windows**.
 
 ## First-time setup
 

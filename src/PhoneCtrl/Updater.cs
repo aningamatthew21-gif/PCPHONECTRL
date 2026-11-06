@@ -52,9 +52,13 @@ namespace PhoneCtrl
             return c;
         }
 
+        /// <summary>True when the last check couldn't reach GitHub (as opposed to "no update").</summary>
+        public bool LastCheckFailed { get; private set; }
+
         /// <summary>Returns update info when GitHub has a newer version than this one, otherwise null.</summary>
         public async Task<UpdateInfo?> CheckAsync()
         {
+            LastCheckFailed = true;
             try
             {
                 using var response = await Http.GetAsync(ReleaseApi);
@@ -81,6 +85,7 @@ namespace PhoneCtrl
                 }
 
                 Log.Info($"Update check: current {CurrentVersion}, latest {latest}");
+                LastCheckFailed = false;
                 return url != null && latest > CurrentVersion ? new UpdateInfo(latest, url) : null;
             }
             catch (Exception ex)

@@ -156,22 +156,98 @@ namespace PhoneCtrl
 
         // ------------------------------------------------------------------ updates
 
+        private enum UpdateUi { Idle, Checking, Available, Working, Message }
+        private UpdateUi _updateUi = UpdateUi.Idle;
+        private DispatcherTimer? _updateMessageTimer;
+
         public void ShowUpdateAvailable(Version version)
         {
-            UpdateText.Text = $"Update to v{version}";
-            UpdateButton.IsEnabled = true;
-            UpdateButton.Visibility = Visibility.Visible;
-            UpdateBadge.Visibility = Visibility.Visible;
+            SetUpdateUi(UpdateUi.Available, $"Update to v{version}");
         }
 
         public void ShowUpdateProgress(string text)
         {
-            UpdateText.Text = text;
-            UpdateButton.IsEnabled = false;
-            UpdateButton.Visibility = Visibility.Visible;
+            SetUpdateUi(UpdateUi.Working, text);
         }
 
-        private void OnUpdateClick(object sender, RoutedEventArgs e) => _app.InstallUpdate();
+        private async void OnUpdateClick(object sender, RoutedEventArgs e)
+        {
+            switch (_updateUi)
+            {
+                case UpdateUi.Available:
+                    _app.InstallUpdate();
+                    return;
+                case UpdateUi.Checking:
+                case UpdateUi.Working:
+                    return;
+            }
+
+            SetUpdateUi(UpdateUi.Checking, "Checking…");
+            var started = DateTime.UtcNow;
+            bool? result = await _app.CheckForUpdatesAsync(userAsked: true, fromWidget: true);
+
+            // Let the spinner show for a moment so the click feels acknowledged.
+            var elapsed = DateTime.UtcNow - started;
+            if (elapsed < TimeSpan.FromMilliseconds(700)) await Task.Delay(TimeSpan.FromMilliseconds(700) - elapsed);
+
+            if (result == true) return; // App already switched the button to "Update to vX"
+            SetUpdateUi(UpdateUi.Message, result == false
+                ? $"You're up to date (v{Updater.CurrentVersion})"
+                : "Couldn't check. Try again");
+        }
+
+        private void SetUpdateUi(UpdateUi state, string text)
+        {
+            _updateUi = state;
+            UpdateText.Text = text;
+            _updateMessageTimer?.Stop();
+
+            bool blue = state == UpdateUi.Available || state == UpdateUi.Working;
+            UpdateButton.Background = blue ? MakeBrush("#0078D4") : MakeBrush("#262626");
+            UpdateButton.Foreground = blue ? Brushes.White : MakeBrush("#9A9A9A");
+            UpdateIcon.Text = blue ? "\uE896" : "\uE895"; // download arrow / sync arrows
+            UpdateBadge.Visibility = state == UpdateUi.Available ? Visibility.Visible : Visibility.Collapsed;
+            UpdateButton.ToolTip = state switch
+            {
+                UpdateUi.Available => "Download and install the new version (the app restarts by itself)",
+                UpdateUi.Idle => "Check GitHub for a newer version of PhoneCtrl",
+                _ => null,
+            };
+
+            bool spin = state == UpdateUi.Checking || state == UpdateUi.Working;
+            if (spin)
+                UpdateIconRotation.BeginAnimation(RotateTransform.AngleProperty,
+                    new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1))
+                    { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+            else
+            {
+                UpdateIconRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+                UpdateIconRotation.Angle = 0;
+            }
+
+            if (state == UpdateUi.Message)
+            {
+                _updateMessageTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                _updateMessageTimer.Tick += (_, _) =>
+                {
+                    _updateMessageTimer?.Stop();
+                    if (_updateUi == UpdateUi.Message) SetUpdateUi(UpdateUi.Idle, "Check for updates");
+                };
+                _updateMessageTimer.Start();
+            }
+        }
+
+        // ---- right-click menu ----
+
+        private void OnMenuCheckUpdates(object sender, RoutedEventArgs e)
+        {
+            SetExpanded(true);
+            OnUpdateClick(sender, e);
+        }
+
+        private void OnMenuHide(object sender, RoutedEventArgs e) => Hide();
+
+        private void OnMenuExit(object sender, RoutedEventArgs e) => _app.Quit();
 
         // ------------------------------------------------------------------ status
 

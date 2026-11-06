@@ -7,6 +7,15 @@
         ResizeMode="NoResize" SizeToContent="WidthAndHeight"
         MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave">
 
+    <Window.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="Check for updates" Click="OnMenuCheckUpdates" />
+            <MenuItem Header="Hide widget (click the tray icon to show it)" Click="OnMenuHide" />
+            <Separator />
+            <MenuItem Header="Exit PhoneCtrl" Click="OnMenuExit" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
     <Window.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
@@ -73,6 +82,32 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="#005A9E" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="UpdateButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#9A9A9A" />
+            <Setter Property="Background" Value="#262626" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="3,10,3,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -175,12 +210,16 @@
                     </StackPanel>
                 </StackPanel>
 
-                <Button x:Name="UpdateButton" Visibility="Collapsed" Style="{StaticResource PadButton}"
-                        Background="#107C10" Height="36" Margin="3,10,3,0" Click="OnUpdateClick"
-                        ToolTip="Download and install the new version (the app restarts by itself)">
+                <!-- Grey "Check for updates" → spinning while checking → blue "Update to vX" when one is ready. -->
+                <Button x:Name="UpdateButton" Style="{StaticResource UpdateButtonStyle}" Click="OnUpdateClick">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE896;" FontSize="14" VerticalAlignment="Center" />
-                        <TextBlock x:Name="UpdateText" Text="Update" FontFamily="Segoe UI" FontSize="12"
+                        <TextBlock x:Name="UpdateIcon" FontFamily="{StaticResource IconFont}" Text="&#xE895;" FontSize="13"
+                                   VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform x:Name="UpdateIconRotation" Angle="0" />
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                        <TextBlock x:Name="UpdateText" Text="Check for updates" FontFamily="Segoe UI" FontSize="12"
                                    FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>

@@ -124,23 +124,33 @@ namespace PhoneCtrl
 
         // ---- updates ----
 
-        public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool userAsked)
+        /// <summary>
+        /// Checks GitHub. Returns true = update ready, false = already up to date, null = couldn't check.
+        /// userAsked: from the tray menu (shows a message box when there's nothing new).
+        /// fromWidget: the widget shows the result itself, so no message box or notification.
+        /// </summary>
+        public async System.Threading.Tasks.Task<bool?> CheckForUpdatesAsync(bool userAsked, bool fromWidget = false)
         {
             var update = await _updater.CheckAsync();
             if (update == null)
             {
-                if (userAsked)
-                    MessageBox.Show($"You have the latest version ({Updater.CurrentVersion}).", "PhoneCtrl",
-                        MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                if (userAsked && !fromWidget)
+                    MessageBox.Show(_updater.LastCheckFailed
+                            ? "Couldn't reach GitHub to check for updates. Check your internet connection and try again."
+                            : $"You have the latest version ({Updater.CurrentVersion}).",
+                        "PhoneCtrl", MessageBoxButton.OK, MessageBoxImage.Information);
+                return _updater.LastCheckFailed ? (bool?)null : false;
             }
             bool isNew = _pendingUpdate == null || _pendingUpdate.Version != update.Version;
             _pendingUpdate = update;
             _widget?.ShowUpdateAvailable(update.Version);
-            if (isNew || userAsked)
+            if (!fromWidget && (isNew || userAsked))
                 _tray?.Notify("PhoneCtrl update available",
-                    $"Version {update.Version} is ready. Click \u2B07 Update in the widget to install it.");
+                    $"Version {update.Version} is ready. Open the widget and click the blue Update button.");
+            return true;
         }
+
+        public bool HasPendingUpdate => _pendingUpdate != null;
 
         public async void InstallUpdate()
         {
@@ -163,6 +173,61 @@ namespace PhoneCtrl
                 MessageBox.Show("The update couldn't be installed:\n\n" + ex.Message +
                     "\n\nYou can download it manually from the GitHub Releases page.",
                     "PhoneCtrl", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // ---- start with Windows / shortcut ----
+
+        private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+
+        private static string ExePath => Environment.ProcessPath ?? "";
+
+        public bool StartsWithWindows
+        {
+            get
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey);
+                return key?.GetValue("PhoneCtrl") is string;
+            }
+            set
+            {
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey);
+                    if (value) key.SetValue("PhoneCtrl", $"\"{ExePath}\"");
+                    else key.DeleteValue("PhoneCtrl", false);
+                    Log.Info($"Start with Windows: {value}");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Could not change start-with-Windows", ex);
+                    MessageBox.Show("Couldn't change the startup setting: " + ex.Message, "PhoneCtrl");
+                }
+            }
+        }
+
+        public void CreateDesktopShortcut()
+        {
+            try
+            {
+                var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                var lnk = System.IO.Path.Combine(desktop, "PhoneCtrl.lnk");
+                var shellType = Type.GetTypeFromProgID("WScript.Shell")
+                    ?? throw new InvalidOperationException("Windows Script Host is not available.");
+                dynamic shell = Activator.CreateInstance(shellType)!;
+                dynamic shortcut = shell.CreateShortcut(lnk);
+                shortcut.TargetPath = ExePath;
+                shortcut.WorkingDirectory = System.IO.Path.GetDirectoryName(ExePath);
+                shortcut.Description = "PhoneCtrl - control your iPhone from this PC";
+                shortcut.Save();
+                Log.Info("Desktop shortcut created: " + lnk);
+                MessageBox.Show("A PhoneCtrl shortcut is now on your desktop.", "PhoneCtrl",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not create desktop shortcut", ex);
+                MessageBox.Show("Couldn't create the shortcut: " + ex.Message, "PhoneCtrl");
             }
         }
 
