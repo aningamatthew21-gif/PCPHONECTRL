@@ -52,6 +52,15 @@ namespace PhoneCtrl
         /// </summary>
         public int SwipeStartFromTop { get; set; } = 350;
 
+        // ---- Now playing ----
+        /// <summary>Show the song playing on the iPhone (read over Bluetooth with Apple Media Service).</summary>
+        public bool ShowNowPlaying { get; set; } = true;
+        /// <summary>
+        /// Look up album artwork on Apple's iTunes Search (sends the song title and artist to itunes.apple.com).
+        /// The iPhone doesn't send artwork over Bluetooth.
+        /// </summary>
+        public bool LookUpAlbumArt { get; set; } = true;
+
         // ---- Bluetooth ----
         public int ReportIntervalMs { get; set; } = 15;
 

@@ -5,6 +5,7 @@ Hover over it to open it, then click to:
 
 | Button | What happens on the iPhone |
 |---|---|
+| Now playing | Album cover, song title, artist and app of what the iPhone is playing |
 | ⏮ ⏯ ⏭ | Previous song · play/pause · next song (Spotify, Apple Music, YouTube Music, …) |
 | 🔉 🔊 | Volume down / up |
 | ∧ ∨ pad | Previous / next video in TikTok, Instagram Reels, YouTube Shorts. Click an arrow **or scroll your mouse wheel over the pad** |
@@ -16,9 +17,14 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 
 ## Privacy and security
 
-* **One-way only.** The PC can only *send* button presses. It can't read anything from the phone:
-  no photos, messages or notifications.
-* **No network.** Nothing goes over Wi-Fi or the internet, so the office network sees nothing.
+* **Almost one-way.** The PC sends button presses. The only thing it reads from the phone is
+  **"now playing"** (song title, artist, album, app, playing/paused) through Apple Media Service, the same
+  Bluetooth feature car stereos use. It can't read photos, messages or notifications.
+  Turn it off with `"ShowNowPlaying": false`.
+* **Album art** isn't sent over Bluetooth, so PhoneCtrl looks it up on Apple's public iTunes Search,
+  which sends the song title and artist to itunes.apple.com. Turn it off with `"LookUpAlbumArt": false`.
+* **No phone traffic on the network.** Control happens over Bluetooth only. The internet is used only for
+  update checks and the album-art lookup above.
 * **Encrypted and paired.** The phone must pair with the PC first (Bluetooth LE Secure Connections).
   Your phone's passcode still protects it when it's locked.
 
@@ -66,6 +72,7 @@ PhoneCtrl is a single file, `PhoneCtrl.exe`, with no installer.
    This is required once, because PhoneCtrl adds media keys and the phone has to learn the new layout.
 3. Start **PhoneCtrl.exe**. A slim tab appears on the right edge of the screen. Its dot shows the status:
    * 🟠 waiting for iPhone · 🟢 connected · 🔴 problem (hover for details)
+   * Bouncing green bars next to the dot mean something is playing on the iPhone.
 4. iPhone: **Settings → Bluetooth** → tap your PC under *Other Devices* → **Pair**.
 5. iPhone: **Settings → Accessibility → Touch → AssistiveTouch → On** (needed for scrolling and lock).
 6. Set up the lock button:
@@ -112,6 +119,8 @@ Tray icon → **Open settings file**, edit, save, then tray icon → **Reload se
 | `CaptureExitRightHoldSeconds` | `2` | Holding the right mouse button this long also brings the mouse back (`0` = off). |
 | `LockMethod` | `"MouseButton"` | `"PowerKey"` tries a media power key instead (experimental). |
 | `LockMouseButton` | `3` | Mouse button sent for lock (must match your AssistiveTouch mapping). |
+| `ShowNowPlaying` | `true` | Show the song playing on the iPhone and the waveform on the tab. |
+| `LookUpAlbumArt` | `true` | Fetch album covers from Apple's iTunes Search. |
 | `HotKeys` | see above | Change or clear (`""`) any shortcut. |
 
 ## Troubleshooting

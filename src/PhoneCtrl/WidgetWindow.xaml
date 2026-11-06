@@ -143,10 +143,29 @@
                 Background="#E61E1E1E" BorderBrush="#40FFFFFF" BorderThickness="1"
                 MouseLeftButtonDown="OnDragStart" ToolTip="PhoneCtrl - hover to open, drag to move">
             <Grid>
-                <Ellipse x:Name="HandleDot" Width="7" Height="7" Fill="#8A8A8A" />
+                <StackPanel x:Name="HandleContent" Orientation="Vertical"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Ellipse x:Name="HandleDot" Width="7" Height="7" Fill="#8A8A8A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <!-- Live "audio is playing" indicator: bouncing bars while the iPhone plays something. -->
+                    <StackPanel x:Name="Waveform" Orientation="Horizontal" Visibility="Collapsed" Height="10"
+                                Margin="0,6,0,0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Rectangle Width="2" Height="10" Margin="0.75,0" RadiusX="1" RadiusY="1" Fill="#2ECC71" RenderTransformOrigin="0.5,0.5">
+                            <Rectangle.RenderTransform><ScaleTransform ScaleY="0.4" /></Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle Width="2" Height="10" Margin="0.75,0" RadiusX="1" RadiusY="1" Fill="#2ECC71" RenderTransformOrigin="0.5,0.5">
+                            <Rectangle.RenderTransform><ScaleTransform ScaleY="0.4" /></Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle Width="2" Height="10" Margin="0.75,0" RadiusX="1" RadiusY="1" Fill="#2ECC71" RenderTransformOrigin="0.5,0.5">
+                            <Rectangle.RenderTransform><ScaleTransform ScaleY="0.4" /></Rectangle.RenderTransform>
+                        </Rectangle>
+                        <Rectangle Width="2" Height="10" Margin="0.75,0" RadiusX="1" RadiusY="1" Fill="#2ECC71" RenderTransformOrigin="0.5,0.5">
+                            <Rectangle.RenderTransform><ScaleTransform ScaleY="0.4" /></Rectangle.RenderTransform>
+                        </Rectangle>
+                    </StackPanel>
+                </StackPanel>
                 <!-- green badge when an update is ready -->
                 <Ellipse x:Name="UpdateBadge" Width="5" Height="5" Fill="#3FD13F" Visibility="Collapsed"
-                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,4,0,0" />
+                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,3,0" />
             </Grid>
         </Border>
 
@@ -167,9 +186,31 @@
                 <StackPanel x:Name="Sections" Orientation="Vertical">
                     <StackPanel x:Name="MusicSection">
                         <TextBlock Text="MUSIC" Style="{StaticResource SectionLabel}" />
+                        <!-- Now playing on the iPhone (shown when the phone shares it) -->
+                        <Grid x:Name="NowPlayingRow" Visibility="Collapsed" Margin="3,0,3,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="46" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="46" Height="46" CornerRadius="8" Background="#2C2C2C">
+                                <Grid>
+                                    <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE8D6;" FontSize="18"
+                                               Foreground="#6E6E6E" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Border x:Name="ArtworkView" CornerRadius="8" />
+                                </Grid>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="TrackTitle" Foreground="White" FontSize="12" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="TrackArtist" Foreground="#A8A8A8" FontSize="11" Margin="0,1,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="TrackApp" Foreground="#6E6E6E" FontSize="10" Margin="0,1,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
                         <UniformGrid Columns="3">
                             <Button Style="{StaticResource PadButton}" Tag="PreviousTrack" Click="OnAction" Content="&#xE892;" ToolTip="Previous song" />
-                            <Button Style="{StaticResource PadButton}" Tag="PlayPause" Click="OnAction" Content="&#xE768;" ToolTip="Play / pause" />
+                            <Button x:Name="PlayPauseButton" Style="{StaticResource PadButton}" Tag="PlayPause" Click="OnAction" Content="&#xE768;" ToolTip="Play / pause" />
                             <Button Style="{StaticResource PadButton}" Tag="NextTrack" Click="OnAction" Content="&#xE893;" ToolTip="Next song" />
                         </UniformGrid>
                     </StackPanel>

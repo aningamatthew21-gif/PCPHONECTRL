@@ -53,6 +53,9 @@ namespace PhoneCtrl.Ble
         public string Detail { get; private set; } = "";
         public bool IsConnected => State == PeripheralState.Connected;
 
+        /// <summary>Windows device ID of the connected phone (used to read now-playing info from it).</summary>
+        public string? ConnectedDeviceId { get; private set; }
+
         /// <summary>Bluetooth name of the connected phone, e.g. "Matthew's iPhone".</summary>
         public string? ConnectedDeviceName { get; private set; }
 
@@ -128,6 +131,7 @@ namespace PhoneCtrl.Ble
             _battery = null;
             _keyboardIn = _mouseIn = _consumerIn = null;
             ConnectedDeviceName = null;
+            ConnectedDeviceId = null;
             SetState(PeripheralState.Stopped, "Stopped");
         }
 
@@ -409,12 +413,22 @@ namespace PhoneCtrl.Ble
 
             if (connected)
             {
+                try
+                {
+                    foreach (var c in _inputs)
+                        if (c.SubscribedClients.Count > 0) { ConnectedDeviceId = c.SubscribedClients[0].Session.DeviceId.Id; break; }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Could not read phone device id", ex);
+                }
                 SetState(PeripheralState.Connected, $"{ConnectedDeviceName ?? "iPhone"} connected");
                 if (ConnectedDeviceName == null) _ = ResolveDeviceNameAsync();
             }
             else
             {
                 ConnectedDeviceName = null;
+                ConnectedDeviceId = null;
                 SetState(PeripheralState.Advertising, "Waiting for iPhone…");
             }
         }

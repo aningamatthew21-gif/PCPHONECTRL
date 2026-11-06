@@ -6,6 +6,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using PhoneCtrl.Ble;
 
@@ -250,6 +253,89 @@ namespace PhoneCtrl
 
         private void OnMenuExit(object sender, RoutedEventArgs e) => _app.Quit();
 
+        // ------------------------------------------------------------------ now playing
+
+        private string _artworkKey = "";
+        private bool _waveformOn;
+
+        public void ShowNowPlaying(NowPlaying np)
+        {
+            if (!_app.Settings.ShowNowPlaying || !np.HasTrack)
+            {
+                NowPlayingRow.Visibility = Visibility.Collapsed;
+                SetWaveform(false);
+                Handle.ToolTip = "PhoneCtrl - hover to open, drag to move";
+                PlayPauseButton.Content = "\uE768";
+                return;
+            }
+
+            NowPlayingRow.Visibility = Visibility.Visible;
+            TrackTitle.Text = np.Title;
+            TrackArtist.Text = string.IsNullOrWhiteSpace(np.Album) ? np.Artist : $"{np.Artist}  ·  {np.Album}";
+            TrackApp.Text = (np.IsPlaying ? "Playing" : "Paused") + (string.IsNullOrWhiteSpace(np.PlayerName) ? "" : $" in {np.PlayerName}");
+            PlayPauseButton.Content = np.IsPlaying ? "\uE769" : "\uE768"; // pause / play icon
+            Handle.ToolTip = $"{(np.IsPlaying ? "♪ " : "")}{np.Title} - {np.Artist}";
+            SetWaveform(np.IsPlaying);
+
+            string key = $"{np.Artist}\n{np.Title}";
+            if (key != _artworkKey)
+            {
+                _artworkKey = key;
+                ArtworkView.Background = null;
+                if (_app.Settings.LookUpAlbumArt) _ = LoadArtworkAsync(np, key);
+            }
+        }
+
+        private async Task LoadArtworkAsync(NowPlaying np, string key)
+        {
+            var bytes = await ArtworkLookup.FindAsync(np.Artist, np.Title, np.Album);
+            if (bytes == null || key != _artworkKey) return;
+            try
+            {
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = new System.IO.MemoryStream(bytes);
+                image.DecodePixelWidth = 92;
+                image.EndInit();
+                image.Freeze();
+                ArtworkView.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+            }
+            catch (Exception ex)
+            {
+                Log.Info("Could not show artwork: " + ex.Message);
+            }
+        }
+
+        /// <summary>Bouncing bars on the pill while something plays on the iPhone.</summary>
+        private void SetWaveform(bool playing)
+        {
+            if (playing == _waveformOn) return;
+            _waveformOn = playing;
+            Waveform.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
+            double[] periods = { 0.42, 0.58, 0.36, 0.50 };
+            int i = 0;
+            foreach (var child in Waveform.Children)
+            {
+                if (child is not Rectangle bar || bar.RenderTransform is not ScaleTransform scale) continue;
+                if (playing)
+                {
+                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.25, 1.0,
+                        TimeSpan.FromSeconds(periods[i++ % periods.Length]))
+                    {
+                        AutoReverse = true,
+                        RepeatBehavior = RepeatBehavior.Forever,
+                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+                    });
+                }
+                else
+                {
+                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                    scale.ScaleY = 0.4;
+                }
+            }
+        }
+
         // ------------------------------------------------------------------ status
 
         public void SetCaptureActive(bool active)
@@ -312,10 +398,12 @@ namespace PhoneCtrl
         {
             if (Horizontal)
             {
+                HandleContent.Orientation = Orientation.Horizontal;
+                Waveform.Margin = new Thickness(7, 0, 0, 0);
                 Handle.Width = 80;
                 Handle.Height = 16;
                 Sections.Orientation = Orientation.Horizontal;
-                MusicSection.Width = 150;
+                MusicSection.Width = 200;
                 VolumeSection.Width = 104;
                 VideoSection.Width = 104;
                 LockSection.Width = 140;
@@ -323,6 +411,8 @@ namespace PhoneCtrl
             }
             else
             {
+                HandleContent.Orientation = Orientation.Vertical;
+                Waveform.Margin = new Thickness(0, 7, 0, 0);
                 Handle.Width = 16;
                 Handle.Height = 80;
                 Sections.Orientation = Orientation.Vertical;

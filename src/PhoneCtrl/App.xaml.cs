@@ -13,6 +13,7 @@ namespace PhoneCtrl
         private WidgetWindow? _widget;
         private TrayIcon? _tray;
         private InputCapture? _capture;
+        private readonly AppleMediaClient _media = new AppleMediaClient();
         private CaptureBanner? _banner;
         private readonly Updater _updater = new Updater();
         private Updater.UpdateInfo? _pendingUpdate;
@@ -89,6 +90,22 @@ namespace PhoneCtrl
 
             _widget = new WidgetWindow(this, _phone, actions);
             _widget.Show();
+
+            // Now playing: once the iPhone connects, read what it's playing over the same Bluetooth link.
+            _media.Changed += np => Dispatcher.InvokeAsync(() => _widget?.ShowNowPlaying(np));
+            _phone.StateChanged += (state, _) => Dispatcher.InvokeAsync(async () =>
+            {
+                if (state == PeripheralState.Connected && Settings.ShowNowPlaying && _phone.ConnectedDeviceId != null)
+                {
+                    await System.Threading.Tasks.Task.Delay(1500); // let the phone finish setting up the link
+                    if (_phone.IsConnected && _phone.ConnectedDeviceId != null)
+                        await _media.ConnectAsync(_phone.ConnectedDeviceId);
+                }
+                else if (state != PeripheralState.Connected)
+                {
+                    _media.Disconnect();
+                }
+            });
 
             _tray = new TrayIcon(this);
 
@@ -333,6 +350,7 @@ namespace PhoneCtrl
             Log.Info("PhoneCtrl exiting");
             _widget?.SavePosition();
             _capture?.Stop();
+            _media.Disconnect();
             _phone?.Stop();
             _tray?.Dispose();
             _widget?.Close();
