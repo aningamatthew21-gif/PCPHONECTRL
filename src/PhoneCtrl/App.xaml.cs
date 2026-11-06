@@ -221,8 +221,10 @@ namespace PhoneCtrl
                 var exe = await _updater.DownloadAndSwapAsync(_pendingUpdate, progress);
                 _widget?.ShowUpdateProgress("Restarting…");
 
-                // Hand over cleanly: free Bluetooth and the single-instance lock BEFORE the new copy starts.
+                // Hand over cleanly: free shortcuts, Bluetooth and the single-instance lock BEFORE the new copy starts.
                 _capture?.Stop();
+                _widget?.ReleaseHotKeys();
+                _media.Disconnect();
                 _phone?.Stop();
                 ReleaseSingleInstance();
 
@@ -240,6 +242,7 @@ namespace PhoneCtrl
                 Log.Error($"New version exited early (code {(proc != null ? proc.ExitCode.ToString() : "n/a")}); rolling back");
                 Updater.RollBack();
                 ReacquireSingleInstance();
+                _widget?.ApplySettings();
                 if (_phone != null) _ = _phone.StartAsync();
                 throw new InvalidOperationException("The new version closed right after starting, so PhoneCtrl went back to the previous version.");
             }

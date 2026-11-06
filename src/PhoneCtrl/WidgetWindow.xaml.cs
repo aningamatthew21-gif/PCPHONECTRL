@@ -88,8 +88,46 @@ namespace PhoneCtrl
                 + $"\nTo come back: {_app.ExitHint()}.";
 
             HotkeyHint.Text = $"v{Updater.CurrentVersion}" + (string.IsNullOrEmpty(lockKey) ? "" : $"  ·  Quick lock: {lockKey}");
+            HotkeyHint.ToolTip = null;
             if (_hotKeys.Failures.Count > 0)
-                HotkeyHint.Text += "\n⚠ " + string.Join("\n⚠ ", _hotKeys.Failures);
+            {
+                // Usually temporary right after an update (the previous copy still holds them), so retry quietly.
+                ScheduleHotKeyRetry();
+                if (_hotKeyRetries >= MaxHotKeyRetries)
+                {
+                    HotkeyHint.Text += $"\n⚠ {_hotKeys.Failures.Count} shortcut(s) are taken by another app. Hover for details.";
+                    HotkeyHint.ToolTip = string.Join("\n", _hotKeys.Failures)
+                        + "\n\nChange them in the settings file (tray icon → Open settings file → HotKeys).";
+                }
+            }
+            else
+            {
+                _hotKeyRetries = 0;
+            }
+        }
+
+        private const int MaxHotKeyRetries = 8;
+        private int _hotKeyRetries;
+        private DispatcherTimer? _hotKeyRetryTimer;
+
+        private void ScheduleHotKeyRetry()
+        {
+            if (_hotKeyRetries >= MaxHotKeyRetries || _hotKeyRetryTimer?.IsEnabled == true) return;
+            _hotKeyRetryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            _hotKeyRetryTimer.Tick += (_, _) =>
+            {
+                _hotKeyRetryTimer!.Stop();
+                _hotKeyRetries++;
+                ApplySettings();
+            };
+            _hotKeyRetryTimer.Start();
+        }
+
+        /// <summary>Free the shortcuts so a newly started copy (after an update) can take them.</summary>
+        public void ReleaseHotKeys()
+        {
+            _hotKeyRetryTimer?.Stop();
+            _hotKeys?.Register(new System.Collections.Generic.Dictionary<string, string>());
         }
 
         // ------------------------------------------------------------------ actions
@@ -307,33 +345,63 @@ namespace PhoneCtrl
             }
         }
 
-        /// <summary>Bouncing bars on the pill while something plays on the iPhone.</summary>
+        private DispatcherTimer? _waveTimer;
+        private readonly Random _random = new Random();
+        private readonly double[] _barLevels = { 0.4, 0.6, 0.5, 0.3 };
+
+        /// <summary>
+        /// Bars on the pill while something plays on the iPhone. Bluetooth control doesn't carry the audio itself,
+        /// so this can't follow the real beat. Instead each bar wanders randomly, rising fast and falling slower,
+        /// so it reads like a live level meter rather than a fixed loop.
+        /// </summary>
         private void SetWaveform(bool playing)
         {
             if (playing == _waveformOn) return;
             _waveformOn = playing;
             Waveform.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
-            double[] periods = { 0.42, 0.58, 0.36, 0.50 };
-            int i = 0;
-            foreach (var child in Waveform.Children)
+
+            if (playing)
             {
-                if (child is not Rectangle bar || bar.RenderTransform is not ScaleTransform scale) continue;
-                if (playing)
-                {
-                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.25, 1.0,
-                        TimeSpan.FromSeconds(periods[i++ % periods.Length]))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = RepeatBehavior.Forever,
-                        EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
-                    });
-                }
-                else
-                {
-                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                    scale.ScaleY = 0.4;
-                }
+                _waveTimer ??= CreateWaveTimer();
+                _waveTimer.Start();
             }
+            else
+            {
+                _waveTimer?.Stop();
+                foreach (var child in Waveform.Children)
+                    if (child is Rectangle bar && bar.RenderTransform is ScaleTransform scale)
+                    {
+                        scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                        scale.ScaleY = 0.4;
+                    }
+            }
+        }
+
+        private DispatcherTimer CreateWaveTimer()
+        {
+            var timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(130) };
+            timer.Tick += (_, _) =>
+            {
+                int i = 0;
+                foreach (var child in Waveform.Children)
+                {
+                    if (child is not Rectangle bar || bar.RenderTransform is not ScaleTransform scale) { i++; continue; }
+                    double previous = _barLevels[i];
+                    // Mostly small moves with occasional jumps, like music levels.
+                    double target = _random.NextDouble() < 0.25
+                        ? 0.25 + _random.NextDouble() * 0.75
+                        : Math.Clamp(previous + (_random.NextDouble() - 0.5) * 0.5, 0.2, 1.0);
+                    _barLevels[i] = target;
+                    bool rising = target > previous;
+                    scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(target,
+                        TimeSpan.FromMilliseconds(rising ? 90 : 220))
+                    {
+                        EasingFunction = new QuadraticEase { EasingMode = rising ? EasingMode.EaseOut : EasingMode.EaseIn },
+                    }, HandoffBehavior.SnapshotAndReplace);
+                    i++;
+                }
+            };
+            return timer;
         }
 
         // ------------------------------------------------------------------ status
