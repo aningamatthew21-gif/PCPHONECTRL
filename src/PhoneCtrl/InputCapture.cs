@@ -68,6 +68,12 @@ namespace PhoneCtrl
         private bool _keyboardDirty;
         private CancellationTokenSource? _loopCts;
 
+        // Right button is held back until we know it's a click (sent to the phone) or a long hold (exit).
+        private readonly DispatcherTimer _rightHoldTimer;
+        private bool _rightPending;
+        private bool _rightClickQueued;
+        private TimeSpan _rightHoldToExit = TimeSpan.FromSeconds(2);
+
         private uint _exitMods;  // MOD_* bits from HotKeys.TryParse
         private uint _exitVk;
 
@@ -82,6 +88,24 @@ namespace PhoneCtrl
             _dispatcher = dispatcher;
             _mouseProc = MouseHook;       // keep delegates alive (the GC must not collect them)
             _keyboardProc = KeyboardHook;
+
+            _rightHoldTimer = new DispatcherTimer(DispatcherPriority.Input, dispatcher);
+            _rightHoldTimer.Tick += (_, _) =>
+            {
+                _rightHoldTimer.Stop();
+                if (_rightPending)
+                {
+                    _rightPending = false;
+                    Log.Info("Right button held: returning mouse to the PC");
+                    Stop();
+                }
+            };
+        }
+
+        /// <summary>Seconds the right button must be held to give the mouse back (0 = feature off).</summary>
+        public void SetRightHoldToExit(double seconds)
+        {
+            _rightHoldToExit = TimeSpan.FromSeconds(Math.Max(0, seconds));
         }
 
         public void SetExitShortcut(string text)
@@ -110,6 +134,8 @@ namespace PhoneCtrl
                 _modifiers = 0;
                 _keys.Clear();
                 _keyboardDirty = false;
+                _rightPending = false;
+                _rightClickQueued = false;
             }
 
             var module = GetModuleHandle(null);
@@ -135,6 +161,8 @@ namespace PhoneCtrl
         {
             if (!IsActive) return;
             IsActive = false;
+            _rightHoldTimer.Stop();
+            _rightPending = false;
             RemoveHooks();
             SetCursorPos(_originalCursor.X, _originalCursor.Y);
             _loopCts?.Cancel();
@@ -174,8 +202,11 @@ namespace PhoneCtrl
                     int dx, dy, wheel;
                     byte buttons;
                     bool mouseDirty;
+                    bool rightClick;
                     lock (_gate)
                     {
+                        rightClick = _rightClickQueued;
+                        _rightClickQueued = false;
                         if (_keyboardDirty)
                         {
                             mods = _modifiers;
@@ -196,6 +227,14 @@ namespace PhoneCtrl
                     if (mouseDirty)
                     {
                         await _phone.SendMouseAsync(buttons, dx, dy, wheel);
+                        sentSomething = true;
+                    }
+                    if (rightClick)
+                    {
+                        // A short right press: deliver it as a quick right click.
+                        await _phone.SendMouseAsync((byte)(buttons | 0x02), 0, 0, 0);
+                        await Task.Delay(40);
+                        await _phone.SendMouseAsync(buttons, 0, 0, 0);
                         sentSomething = true;
                     }
                 }
@@ -231,8 +270,26 @@ namespace PhoneCtrl
                         break;
                     case WM_LBUTTONDOWN: _buttons |= 0x01; break;
                     case WM_LBUTTONUP: _buttons &= unchecked((byte)~0x01); break;
-                    case WM_RBUTTONDOWN: _buttons |= 0x02; break;
-                    case WM_RBUTTONUP: _buttons &= unchecked((byte)~0x02); break;
+                    case WM_RBUTTONDOWN:
+                        if (_rightHoldToExit > TimeSpan.Zero)
+                        {
+                            // Don't send yet: a long hold means "give the mouse back".
+                            _rightPending = true;
+                            _rightHoldTimer.Stop();
+                            _rightHoldTimer.Interval = _rightHoldToExit;
+                            _rightHoldTimer.Start();
+                        }
+                        else _buttons |= 0x02;
+                        break;
+                    case WM_RBUTTONUP:
+                        if (_rightPending)
+                        {
+                            _rightPending = false;
+                            _rightHoldTimer.Stop();
+                            _rightClickQueued = true;
+                        }
+                        else _buttons &= unchecked((byte)~0x02);
+                        break;
                     case WM_MBUTTONDOWN: _buttons |= 0x04; break;
                     case WM_MBUTTONUP: _buttons &= unchecked((byte)~0x04); break;
                     case WM_XBUTTONDOWN:

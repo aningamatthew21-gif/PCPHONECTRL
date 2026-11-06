@@ -174,6 +174,20 @@ namespace PhoneCtrl.Ble
             }
         });
 
+        /// <summary>Move in small steps so iOS pointer acceleration stays low and the distance is predictable.</summary>
+        public Task MoveSlowlyAsync(int dx, int dy, int step) => RunAsync(async () =>
+        {
+            step = Math.Clamp(step, 1, 127);
+            while (dx != 0 || dy != 0)
+            {
+                int sx = Math.Clamp(dx, -step, step);
+                int sy = Math.Clamp(dy, -step, step);
+                await NotifyAsync(_mouseIn, MouseReport(0, sx, sy, 0));
+                dx -= sx;
+                dy -= sy;
+            }
+        });
+
         /// <summary>Press and release a keyboard key (HID usage code) with optional modifier bits.</summary>
         public Task PressKeyAsync(byte usage, byte modifiers = 0) => RunAsync(async () =>
         {

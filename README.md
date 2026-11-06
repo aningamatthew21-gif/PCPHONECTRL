@@ -8,7 +8,7 @@ Hover over it to open it, then click to:
 | ⏮ ⏯ ⏭ | Previous song · play/pause · next song (Spotify, Apple Music, YouTube Music, …) |
 | 🔉 🔊 | Volume down / up |
 | ∧ ∨ pad | Previous / next video in TikTok, Instagram Reels, YouTube Shorts. Click an arrow **or scroll your mouse wheel over the pad** |
-| 🖱 (top-right of the panel) | **Use your mouse and keyboard on the iPhone**. Press **Ctrl + Alt + Q** to bring them back |
+| 🖱 (top-right of the panel) | **Use your mouse and keyboard on the iPhone**. **Hold the right mouse button for 2 seconds** (or press Ctrl + Alt + Q) to bring them back |
 | 🔒 Lock phone | Locks the phone, so the screen goes black |
 
 No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be a
@@ -55,8 +55,8 @@ You can also use tray icon → **Check for updates**. This requires the GitHub r
 6. Set up the lock button:
    **AssistiveTouch → Pointer Devices → Devices → (your PC) → Customize Additional Buttons…**
    When it asks you to press a button, click **🔒 Lock phone** in the widget, then choose **Lock Screen**.
-7. Click 🖱 in the panel, move the phone's pointer over the video, press **Ctrl + Alt + Q**, then try ∨.
-   The pad sends a finger-style swipe at the pointer's position. If it goes the wrong way, see *Settings* below.
+7. Open TikTok/Reels and try ∨. Each swipe first moves the phone's pointer to the middle of the screen,
+   so it never starts at the bottom edge (which would go Home). If it goes the wrong way, see *Settings* below.
 
 ## Keyboard shortcuts (work from any app)
 
@@ -89,9 +89,11 @@ Tray icon → **Open settings file**, edit, save, then tray icon → **Reload se
 | `ScrollMethod` | `"Swipe"` | `"Swipe"` drags like a finger; `"Wheel"` sends scroll-wheel notches. |
 | `SwipeDistance` | `400` | How far a swipe drags. Raise it if the video doesn't change. |
 | `SwipeSteps` | `8` | Fewer steps = faster flick. |
+| `SwipeStartFromTop` | `350` | Before each swipe the pointer goes to the top, then this far down. Lower it if a swipe still goes Home; raise it if swipes start too high. |
 | `ScrollNotches` | `1` | Wheel notches per click (`"Wheel"` method only). |
 | `InvertScroll` | `false` | Set to `true` if ∨ goes to the *previous* video. |
 | `CaptureExitKey` | `"Ctrl+Alt+Q"` | Shortcut that brings the mouse back to the PC. |
+| `CaptureExitRightHoldSeconds` | `2` | Holding the right mouse button this long also brings the mouse back (`0` = off). |
 | `LockMethod` | `"MouseButton"` | `"PowerKey"` tries a media power key instead (experimental). |
 | `LockMouseButton` | `3` | Mouse button sent for lock (must match your AssistiveTouch mapping). |
 | `HotKeys` | see above | Change or clear (`""`) any shortcut. |

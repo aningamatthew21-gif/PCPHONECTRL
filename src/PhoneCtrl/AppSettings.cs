@@ -34,6 +34,8 @@ namespace PhoneCtrl
         // ---- Mouse on iPhone ----
         /// <summary>Shortcut that brings the mouse and keyboard back to the PC.</summary>
         public string CaptureExitKey { get; set; } = "Ctrl+Alt+Q";
+        /// <summary>Holding the right mouse button this many seconds also brings the mouse back (0 = off).</summary>
+        public double CaptureExitRightHoldSeconds { get; set; } = 2;
 
         // ---- Lock ----
         /// <summary>"MouseButton" (AssistiveTouch custom button → Lock Screen) or "PowerKey" (experimental).</summary>
@@ -41,10 +43,14 @@ namespace PhoneCtrl
         /// <summary>Mouse button sent for lock: 3 = middle, 4, 5 = extra buttons. Must match your AssistiveTouch mapping.</summary>
         public int LockMouseButton { get; set; } = 3;
 
-        // ---- "Center pointer" helper ----
-        /// <summary>Pointer movement (in mouse counts) from the top-left corner to the middle of the screen.</summary>
-        public int CenterOffsetX { get; set; } = 200;
-        public int CenterOffsetY { get; set; } = 400;
+        // ---- Where swipes start ----
+        /// <summary>
+        /// Before each swipe the phone pointer is pushed to the top of the screen, then moved this far down
+        /// (mouse counts, sent slowly so iOS doesn't accelerate it). Swipes must start mid-screen: a swipe
+        /// up from the bottom edge is the iPhone "go Home" gesture. Raise it if swipes start too high,
+        /// lower it if they still go Home. Set 0 to swipe from wherever the pointer is.
+        /// </summary>
+        public int SwipeStartFromTop { get; set; } = 350;
 
         // ---- Bluetooth ----
         public int ReportIntervalMs { get; set; } = 15;

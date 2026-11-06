@@ -56,21 +56,27 @@ namespace PhoneCtrl
             }
         }
 
-        private Task FeedAsync(AppSettings s, bool next, int sign)
+        private async Task FeedAsync(AppSettings s, bool next, int sign)
         {
             int direction = (next ? -1 : 1) * sign;
             if (string.Equals(s.ScrollMethod, "Wheel", StringComparison.OrdinalIgnoreCase))
+            {
                 // Wheel "down" (negative) moves the feed to the next video, like a PC mouse wheel.
-                return _phone.ScrollAsync(direction * s.ScrollNotches);
+                await _phone.ScrollAsync(direction * s.ScrollNotches);
+                return;
+            }
+            // Never start a swipe at the bottom edge (that's the "go Home" gesture): put the pointer mid-screen first.
+            await CenterPointerAsync(s);
             // Swipe up (negative) = next video, exactly like flicking with a finger.
-            return _phone.SwipeAsync(direction * s.SwipeDistance, s.SwipeSteps);
+            await _phone.SwipeAsync(direction * s.SwipeDistance, s.SwipeSteps);
         }
 
         private async Task CenterPointerAsync(AppSettings s)
         {
-            // Slam the pointer into the top-left corner, then move a known distance.
-            await _phone.MoveAsync(-127 * 20, -127 * 40);
-            await _phone.MoveAsync(s.CenterOffsetX, s.CenterOffsetY);
+            if (s.SwipeStartFromTop <= 0) return;
+            // Push the pointer against the top edge (it stops there), then move slowly down a known distance.
+            await _phone.MoveAsync(0, -127 * 25);
+            await _phone.MoveSlowlyAsync(0, s.SwipeStartFromTop, 12);
         }
     }
 }

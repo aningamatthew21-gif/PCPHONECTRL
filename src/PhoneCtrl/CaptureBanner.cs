@@ -60,9 +60,9 @@ namespace PhoneCtrl
             SizeChanged += (_, _) => Position();
         }
 
-        public void ShowFor(string exitKey)
+        public void ShowFor(string exitHint)
         {
-            _text.Text = $"Your mouse and keyboard are on the iPhone  -  press {exitKey} to come back";
+            _text.Text = $"Your mouse and keyboard are on the iPhone  -  {exitHint} to come back";
             Show();
             Position();
         }

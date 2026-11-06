@@ -53,10 +53,11 @@ namespace PhoneCtrl
 
             _capture = new InputCapture(_phone, Dispatcher);
             _capture.SetExitShortcut(Settings.CaptureExitKey);
+            _capture.SetRightHoldToExit(Settings.CaptureExitRightHoldSeconds);
             _banner = new CaptureBanner();
             _capture.ActiveChanged += active =>
             {
-                if (active) _banner.ShowFor(Settings.CaptureExitKey); else _banner.Hide();
+                if (active) _banner.ShowFor(ExitHint()); else _banner.Hide();
                 _widget?.SetCaptureActive(active);
             };
             // If the phone disconnects while it has the mouse, give the mouse back immediately.
@@ -112,6 +113,11 @@ namespace PhoneCtrl
             }
             Log.Info("Closed BleHid");
         }
+
+        /// <summary>How to get the mouse back, e.g. "hold the right mouse button 2 s or press Ctrl+Alt+Q".</summary>
+        public string ExitHint() => Settings.CaptureExitRightHoldSeconds > 0
+            ? $"hold the right mouse button {Settings.CaptureExitRightHoldSeconds:0.#} s or press {Settings.CaptureExitKey}"
+            : $"press {Settings.CaptureExitKey}";
 
         /// <summary>Send this PC's mouse and keyboard to the iPhone until the exit shortcut is pressed.</summary>
         public bool StartCapture() => _capture?.Start() == true;
@@ -180,6 +186,7 @@ namespace PhoneCtrl
             Settings = AppSettings.Load();
             if (_phone != null) _phone.ReportIntervalMs = Settings.ReportIntervalMs;
             _capture?.SetExitShortcut(Settings.CaptureExitKey);
+            _capture?.SetRightHoldToExit(Settings.CaptureExitRightHoldSeconds);
             _widget?.ApplySettings();
         }
 

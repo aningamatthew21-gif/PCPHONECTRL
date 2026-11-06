@@ -81,7 +81,7 @@ namespace PhoneCtrl
             s.HotKeys.TryGetValue(nameof(PhoneAction.MouseToPhone), out var mouseKey);
             MouseToPhoneButton.ToolTip = "Use your mouse and keyboard on the iPhone"
                 + (string.IsNullOrEmpty(mouseKey) ? "" : $" ({mouseKey})")
-                + $"\nPress {s.CaptureExitKey} to bring them back to the PC.";
+                + $"\nTo come back: {_app.ExitHint()}.";
 
             HotkeyHint.Text = $"v{Updater.CurrentVersion}" + (string.IsNullOrEmpty(lockKey) ? "" : $"  ·  Quick lock: {lockKey}");
             if (_hotKeys.Failures.Count > 0)
@@ -193,7 +193,7 @@ namespace PhoneCtrl
             if (_captureActive && state == PeripheralState.Connected)
             {
                 color = "#4CC2FF";
-                detail = $"Mouse on iPhone ({_app.Settings.CaptureExitKey})";
+                detail = "Mouse on iPhone (hold right button to return)";
             }
             StatusDot.Fill = MakeBrush(color);
             HandleDot.Fill = MakeBrush(color);
