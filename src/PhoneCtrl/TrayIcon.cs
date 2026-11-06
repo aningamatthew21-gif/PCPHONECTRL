@@ -24,6 +24,7 @@ namespace PhoneCtrl
             menu.Items.Add("Open settings file", null, (_, _) => App.OpenInShell(AppSettings.FilePath));
             menu.Items.Add("Reload settings", null, (_, _) => _app.ReloadSettings());
             menu.Items.Add("Open log folder", null, (_, _) => App.OpenInShell(Log.Folder));
+            menu.Items.Add("Check for updates", null, async (_, _) => await _app.CheckForUpdatesAsync(userAsked: true));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Exit", null, (_, _) => _app.Quit());
             menu.Opening += (_, _) => toggle.Text = _app.WidgetVisible ? "Hide widget" : "Show widget";
@@ -31,7 +32,7 @@ namespace PhoneCtrl
             _icon = new NotifyIcon
             {
                 Icon = DrawIcon(),
-                Text = "PhoneCtrl",
+                Text = $"PhoneCtrl {Updater.CurrentVersion}",
                 ContextMenuStrip = menu,
                 Visible = true,
             };
@@ -64,6 +65,11 @@ namespace PhoneCtrl
                 g.FillEllipse(screen, 14, 25, 4, 3);
             }
             return Icon.FromHandle(bmp.GetHicon());
+        }
+
+        public void Notify(string title, string text)
+        {
+            _icon.ShowBalloonTip(8000, title, text, ToolTipIcon.Info);
         }
 
         public void Dispose()

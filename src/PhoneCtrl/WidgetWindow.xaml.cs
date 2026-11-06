@@ -83,7 +83,7 @@ namespace PhoneCtrl
                 + (string.IsNullOrEmpty(mouseKey) ? "" : $" ({mouseKey})")
                 + $"\nPress {s.CaptureExitKey} to bring them back to the PC.";
 
-            HotkeyHint.Text = string.IsNullOrEmpty(lockKey) ? "" : $"Quick lock: {lockKey}";
+            HotkeyHint.Text = $"v{Updater.CurrentVersion}" + (string.IsNullOrEmpty(lockKey) ? "" : $"  ·  Quick lock: {lockKey}");
             if (_hotKeys.Failures.Count > 0)
                 HotkeyHint.Text += "\n⚠ " + string.Join("\n⚠ ", _hotKeys.Failures);
         }
@@ -153,6 +153,25 @@ namespace PhoneCtrl
             _messageTimer.Stop();
             _messageTimer.Start();
         }
+
+        // ------------------------------------------------------------------ updates
+
+        public void ShowUpdateAvailable(Version version)
+        {
+            UpdateText.Text = $"Update to v{version}";
+            UpdateButton.IsEnabled = true;
+            UpdateButton.Visibility = Visibility.Visible;
+            UpdateBadge.Visibility = Visibility.Visible;
+        }
+
+        public void ShowUpdateProgress(string text)
+        {
+            UpdateText.Text = text;
+            UpdateButton.IsEnabled = false;
+            UpdateButton.Visibility = Visibility.Visible;
+        }
+
+        private void OnUpdateClick(object sender, RoutedEventArgs e) => _app.InstallUpdate();
 
         // ------------------------------------------------------------------ status
 

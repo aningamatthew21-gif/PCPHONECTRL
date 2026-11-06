@@ -35,6 +35,13 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 2. Put `PhoneCtrl.exe` anywhere (for example `Documents\PhoneCtrl`) and double-click it.
    Windows SmartScreen may warn because the exe is unsigned: **More info → Run anyway**.
 
+## Updates
+
+PhoneCtrl checks GitHub for a new version when it starts and every 4 hours. When one is ready,
+a green dot appears on the widget tab, a notification pops up, and a green **⬇ Update to vX** button
+appears in the panel. Click it and the app downloads the new version, swaps it in, and restarts.
+You can also use tray icon → **Check for updates**. This requires the GitHub repository to be public.
+
 ## First-time setup
 
 1. **You don't need BleHid any more.** PhoneCtrl has its own Bluetooth connection. If BleHid is running,

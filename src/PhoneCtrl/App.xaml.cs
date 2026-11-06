@@ -14,12 +14,19 @@ namespace PhoneCtrl
         private TrayIcon? _tray;
         private InputCapture? _capture;
         private CaptureBanner? _banner;
+        private readonly Updater _updater = new Updater();
+        private Updater.UpdateInfo? _pendingUpdate;
+        private System.Windows.Threading.DispatcherTimer? _updateTimer;
+        private bool _installing;
 
         public AppSettings Settings { get; private set; } = new AppSettings();
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // After a self-update, the new version waits here for the old one to close.
+            Updater.WaitForPreviousInstance(e.Args);
 
             _singleInstance = new Mutex(true, @"Local\PhoneCtrl.SingleInstance", out bool isFirst);
             if (!isFirst)
@@ -38,7 +45,7 @@ namespace PhoneCtrl
             AppDomain.CurrentDomain.UnhandledException += (_, args) =>
                 Log.Error("Unhandled exception", args.ExceptionObject as Exception);
 
-            Log.Info("PhoneCtrl starting");
+            Log.Info($"PhoneCtrl {Updater.CurrentVersion} starting");
             Settings = AppSettings.Load();
 
             _phone = new HidPeripheral { ReportIntervalMs = Settings.ReportIntervalMs };
@@ -66,6 +73,16 @@ namespace PhoneCtrl
 
             CloseBleHidIfRunning();
             _ = _phone.StartAsync();
+
+            // Look for updates shortly after start, then every 4 hours.
+            System.Threading.Tasks.Task.Run(Updater.CleanUp);
+            _updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            _updateTimer.Tick += async (_, _) =>
+            {
+                _updateTimer.Interval = TimeSpan.FromHours(4);
+                await CheckForUpdatesAsync(userAsked: false);
+            };
+            _updateTimer.Start();
         }
 
         /// <summary>BleHid publishes the same Bluetooth service, so the two can't run together.</summary>
@@ -98,6 +115,50 @@ namespace PhoneCtrl
 
         /// <summary>Send this PC's mouse and keyboard to the iPhone until the exit shortcut is pressed.</summary>
         public bool StartCapture() => _capture?.Start() == true;
+
+        // ---- updates ----
+
+        public async System.Threading.Tasks.Task CheckForUpdatesAsync(bool userAsked)
+        {
+            var update = await _updater.CheckAsync();
+            if (update == null)
+            {
+                if (userAsked)
+                    MessageBox.Show($"You have the latest version ({Updater.CurrentVersion}).", "PhoneCtrl",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            bool isNew = _pendingUpdate == null || _pendingUpdate.Version != update.Version;
+            _pendingUpdate = update;
+            _widget?.ShowUpdateAvailable(update.Version);
+            if (isNew || userAsked)
+                _tray?.Notify("PhoneCtrl update available",
+                    $"Version {update.Version} is ready. Click \u2B07 Update in the widget to install it.");
+        }
+
+        public async void InstallUpdate()
+        {
+            if (_pendingUpdate == null || _installing) return;
+            _installing = true;
+            try
+            {
+                var progress = new Progress<int>(p => _widget?.ShowUpdateProgress($"Downloading… {p}%"));
+                _widget?.ShowUpdateProgress("Downloading…");
+                var exe = await _updater.DownloadAndSwapAsync(_pendingUpdate, progress);
+                _widget?.ShowUpdateProgress("Restarting…");
+                Updater.Restart(exe);
+                Quit();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Update failed", ex);
+                _installing = false;
+                _widget?.ShowUpdateAvailable(_pendingUpdate.Version);
+                MessageBox.Show("The update couldn't be installed:\n\n" + ex.Message +
+                    "\n\nYou can download it manually from the GitHub Releases page.",
+                    "PhoneCtrl", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
 
         // ---- called from the tray menu ----
 

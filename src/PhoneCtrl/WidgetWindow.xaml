@@ -107,7 +107,12 @@
         <Border x:Name="Handle" Width="16" Height="80" CornerRadius="8"
                 Background="#E61E1E1E" BorderBrush="#40FFFFFF" BorderThickness="1"
                 MouseLeftButtonDown="OnDragStart" ToolTip="PhoneCtrl - hover to open, drag to move">
-            <Ellipse x:Name="HandleDot" Width="7" Height="7" Fill="#8A8A8A" />
+            <Grid>
+                <Ellipse x:Name="HandleDot" Width="7" Height="7" Fill="#8A8A8A" />
+                <!-- green badge when an update is ready -->
+                <Ellipse x:Name="UpdateBadge" Width="5" Height="5" Fill="#3FD13F" Visibility="Collapsed"
+                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,4,0,0" />
+            </Grid>
         </Border>
 
         <!-- Expanded panel -->
@@ -169,6 +174,16 @@
                         </Button>
                     </StackPanel>
                 </StackPanel>
+
+                <Button x:Name="UpdateButton" Visibility="Collapsed" Style="{StaticResource PadButton}"
+                        Background="#107C10" Height="36" Margin="3,10,3,0" Click="OnUpdateClick"
+                        ToolTip="Download and install the new version (the app restarts by itself)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE896;" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock x:Name="UpdateText" Text="Update" FontFamily="Segoe UI" FontSize="12"
+                                   FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
 
                 <TextBlock x:Name="HotkeyHint" Foreground="#6E6E6E" FontSize="10" Margin="4,6,4,2" TextWrapping="Wrap" />
             </StackPanel>

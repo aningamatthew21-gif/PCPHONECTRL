@@ -11,7 +11,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>PhoneCtrl</AssemblyName>
     <RootNamespace>PhoneCtrl</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.3.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
