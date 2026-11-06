@@ -45,9 +45,44 @@
             </Setter>
         </Style>
 
+        <!-- Arrows inside the video pad: grey until hovered, then they "pop". -->
+        <Style x:Key="ArrowButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#5C5C5C" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter x:Name="Cp" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              RenderTransformOrigin="0.5,0.5">
+                                <ContentPresenter.RenderTransform>
+                                    <ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1" />
+                                </ContentPresenter.RenderTransform>
+                            </ContentPresenter>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter TargetName="Bd" Property="Background" Value="#0078D4" />
+                                <Setter TargetName="Scale" Property="ScaleX" Value="1.2" />
+                                <Setter TargetName="Scale" Property="ScaleY" Value="1.2" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#005A9E" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="LockButton" TargetType="Button" BasedOn="{StaticResource PadButton}">
             <Setter Property="Background" Value="#B3261E" />
-            <Setter Property="Height" Value="44" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -77,46 +112,64 @@
         </Border>
 
         <!-- Expanded panel -->
-        <Border x:Name="ExpandedPanel" Visibility="Collapsed" Width="184" CornerRadius="16" Padding="8"
+        <Border x:Name="ExpandedPanel" Visibility="Collapsed" CornerRadius="16" Padding="8"
                 Background="#F21B1B1B" BorderBrush="#40FFFFFF" BorderThickness="1">
             <StackPanel>
                 <DockPanel Background="Transparent" Margin="4,2,0,0" MouseLeftButtonDown="OnDragStart"
-                           Cursor="SizeAll" ToolTip="Drag to move">
-                    <Button DockPanel.Dock="Right" Style="{StaticResource PadButton}" Width="28" Height="28"
-                            FontSize="12" Margin="0" Tag="CenterPointer" Click="OnAction" Content="&#xE7C9;"
-                            ToolTip="Move the phone's pointer to the middle of the screen" />
+                           Cursor="SizeAll" ToolTip="Drag to move (snaps to any screen edge)">
+                    <Button x:Name="MouseToPhoneButton" DockPanel.Dock="Right" Style="{StaticResource PadButton}"
+                            Width="30" Height="30" FontSize="14" Margin="6,0,0,0"
+                            Tag="MouseToPhone" Click="OnAction" Content="&#xE962;" />
                     <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#8A8A8A" VerticalAlignment="Center" />
                     <TextBlock x:Name="StatusText" Text="Starting…" Foreground="#DDDDDD" FontSize="12"
                                Margin="8,0,4,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 </DockPanel>
 
-                <TextBlock Text="MUSIC" Style="{StaticResource SectionLabel}" />
-                <UniformGrid Columns="3">
-                    <Button Style="{StaticResource PadButton}" Tag="PreviousTrack" Click="OnAction" Content="&#xE892;" ToolTip="Previous song" />
-                    <Button Style="{StaticResource PadButton}" Tag="PlayPause" Click="OnAction" Content="&#xE768;" ToolTip="Play / pause" />
-                    <Button Style="{StaticResource PadButton}" Tag="NextTrack" Click="OnAction" Content="&#xE893;" ToolTip="Next song" />
-                </UniformGrid>
-
-                <TextBlock Text="VOLUME" Style="{StaticResource SectionLabel}" />
-                <UniformGrid Columns="2">
-                    <Button Style="{StaticResource PadButton}" Tag="VolumeDown" Click="OnAction" Content="&#xE993;" ToolTip="Volume down" />
-                    <Button Style="{StaticResource PadButton}" Tag="VolumeUp" Click="OnAction" Content="&#xE995;" ToolTip="Volume up" />
-                </UniformGrid>
-
-                <TextBlock Text="TIKTOK / REELS" Style="{StaticResource SectionLabel}" />
-                <UniformGrid Columns="2">
-                    <Button Style="{StaticResource PadButton}" Tag="PreviousVideo" Click="OnAction" Content="&#xE70E;" ToolTip="Previous video (scroll up)" />
-                    <Button Style="{StaticResource PadButton}" Tag="NextVideo" Click="OnAction" Content="&#xE70D;" ToolTip="Next video (scroll down)" />
-                </UniformGrid>
-
-                <Button Style="{StaticResource LockButton}" Tag="Lock" Click="OnAction" Margin="3,12,3,3"
-                        ToolTip="Lock the phone (screen goes black)">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE72E;" FontSize="15" VerticalAlignment="Center" />
-                        <TextBlock Text="Lock phone" FontFamily="Segoe UI" FontSize="13" FontWeight="SemiBold"
-                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                <StackPanel x:Name="Sections" Orientation="Vertical">
+                    <StackPanel x:Name="MusicSection">
+                        <TextBlock Text="MUSIC" Style="{StaticResource SectionLabel}" />
+                        <UniformGrid Columns="3">
+                            <Button Style="{StaticResource PadButton}" Tag="PreviousTrack" Click="OnAction" Content="&#xE892;" ToolTip="Previous song" />
+                            <Button Style="{StaticResource PadButton}" Tag="PlayPause" Click="OnAction" Content="&#xE768;" ToolTip="Play / pause" />
+                            <Button Style="{StaticResource PadButton}" Tag="NextTrack" Click="OnAction" Content="&#xE893;" ToolTip="Next song" />
+                        </UniformGrid>
                     </StackPanel>
-                </Button>
+
+                    <StackPanel x:Name="VolumeSection">
+                        <TextBlock Text="VOLUME" Style="{StaticResource SectionLabel}" />
+                        <UniformGrid Columns="2">
+                            <Button Style="{StaticResource PadButton}" Tag="VolumeDown" Click="OnAction" Content="&#xE993;" ToolTip="Volume down" />
+                            <Button Style="{StaticResource PadButton}" Tag="VolumeUp" Click="OnAction" Content="&#xE995;" ToolTip="Volume up" />
+                        </UniformGrid>
+                    </StackPanel>
+
+                    <StackPanel x:Name="VideoSection">
+                        <TextBlock Text="VIDEOS" Style="{StaticResource SectionLabel}" />
+                        <!-- One pad: click an arrow, or scroll the mouse wheel anywhere on it. -->
+                        <Border x:Name="VideoPad" Height="40" Margin="3" CornerRadius="10" Background="#2C2C2C"
+                                MouseWheel="OnVideoPadWheel"
+                                ToolTip="Click an arrow, or scroll your mouse wheel here, to change TikTok / Reels / Shorts videos">
+                            <UniformGrid Columns="2">
+                                <Button x:Name="PrevVideoButton" Style="{StaticResource ArrowButton}" Tag="PreviousVideo"
+                                        Click="OnAction" Content="&#xE70E;" ToolTip="Previous video" />
+                                <Button x:Name="NextVideoButton" Style="{StaticResource ArrowButton}" Tag="NextVideo"
+                                        Click="OnAction" Content="&#xE70D;" ToolTip="Next video" />
+                            </UniformGrid>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel x:Name="LockSection">
+                        <TextBlock Text="PHONE" Style="{StaticResource SectionLabel}" />
+                        <Button Style="{StaticResource LockButton}" Tag="Lock" Click="OnAction"
+                                ToolTip="Lock the phone (screen goes black)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE72E;" FontSize="15" VerticalAlignment="Center" />
+                                <TextBlock Text="Lock phone" FontFamily="Segoe UI" FontSize="13" FontWeight="SemiBold"
+                                           Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
 
                 <TextBlock x:Name="HotkeyHint" Foreground="#6E6E6E" FontSize="10" Margin="4,6,4,2" TextWrapping="Wrap" />
             </StackPanel>

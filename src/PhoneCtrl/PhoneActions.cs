@@ -15,6 +15,7 @@ namespace PhoneCtrl
         NextVideo,
         Lock,
         CenterPointer,
+        MouseToPhone,
     }
 
     /// <summary>Turns a widget button / hotkey into the right Bluetooth input for the iPhone.</summary>
@@ -42,9 +43,8 @@ namespace PhoneCtrl
                 case PhoneAction.VolumeDown: return _phone.PressMediaKeyAsync(MediaKey.VolumeDown);
                 case PhoneAction.VolumeUp: return _phone.PressMediaKeyAsync(MediaKey.VolumeUp);
 
-                // Wheel "down" (negative) moves the feed to the next video, like a PC mouse wheel.
-                case PhoneAction.NextVideo: return _phone.ScrollAsync(-s.ScrollNotches * scrollSign);
-                case PhoneAction.PreviousVideo: return _phone.ScrollAsync(s.ScrollNotches * scrollSign);
+                case PhoneAction.NextVideo: return FeedAsync(s, next: true, scrollSign);
+                case PhoneAction.PreviousVideo: return FeedAsync(s, next: false, scrollSign);
 
                 case PhoneAction.Lock:
                     return string.Equals(s.LockMethod, "PowerKey", StringComparison.OrdinalIgnoreCase)
@@ -54,6 +54,16 @@ namespace PhoneCtrl
                 case PhoneAction.CenterPointer: return CenterPointerAsync(s);
                 default: return Task.CompletedTask;
             }
+        }
+
+        private Task FeedAsync(AppSettings s, bool next, int sign)
+        {
+            int direction = (next ? -1 : 1) * sign;
+            if (string.Equals(s.ScrollMethod, "Wheel", StringComparison.OrdinalIgnoreCase))
+                // Wheel "down" (negative) moves the feed to the next video, like a PC mouse wheel.
+                return _phone.ScrollAsync(direction * s.ScrollNotches);
+            // Swipe up (negative) = next video, exactly like flicking with a finger.
+            return _phone.SwipeAsync(direction * s.SwipeDistance, s.SwipeSteps);
         }
 
         private async Task CenterPointerAsync(AppSettings s)

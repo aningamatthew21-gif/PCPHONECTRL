@@ -63,7 +63,7 @@ namespace PhoneCtrl
             foreach (var f in Failures) Log.Info("Hotkey problem: " + f);
         }
 
-        private static bool TryParse(string text, out uint mods, out uint vk)
+        internal static bool TryParse(string text, out uint mods, out uint vk)
         {
             mods = 0;
             vk = 0;

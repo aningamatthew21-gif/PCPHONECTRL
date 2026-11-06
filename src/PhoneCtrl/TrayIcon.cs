@@ -18,6 +18,7 @@ namespace PhoneCtrl
             var toggle = new ToolStripMenuItem("Hide widget");
             toggle.Click += (_, _) => _app.ToggleWidget();
             menu.Items.Add(toggle);
+            menu.Items.Add("Use mouse on iPhone", null, (_, _) => _app.StartCapture());
             menu.Items.Add("Restart Bluetooth", null, (_, _) => _app.RestartBluetooth());
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Open settings file", null, (_, _) => App.OpenInShell(AppSettings.FilePath));

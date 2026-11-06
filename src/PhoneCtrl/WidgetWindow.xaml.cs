@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,8 +11,11 @@ using PhoneCtrl.Ble;
 
 namespace PhoneCtrl
 {
+    public enum DockEdge { Left, Right, Top, Bottom }
+
     /// <summary>
-    /// The on-screen widget: a slim tab docked to a screen edge that opens into the control panel on hover.
+    /// The on-screen widget: a slim tab docked to any screen edge that opens into the control panel on hover.
+    /// On the left/right edges it is tall (portrait); on the top/bottom edges it lays out sideways (landscape).
     /// </summary>
     public partial class WidgetWindow : Window
     {
@@ -29,10 +33,11 @@ namespace PhoneCtrl
         private readonly DispatcherTimer _messageTimer;
         private HotKeys? _hotKeys;
 
-        private bool _rightEdge = true;
-        private double _edgeX = double.NaN;
-        private double _centerY = double.NaN;
+        private DockEdge _edge = DockEdge.Right;
+        private Point _anchor = new Point(double.NaN, double.NaN); // a point on our monitor; also our spot along the edge
         private bool _dragging;
+        private bool _captureActive;
+        private DateTime _lastWheelSwipe = DateTime.MinValue;
 
         public WidgetWindow(App app, HidPeripheral phone, PhoneActions actions)
         {
@@ -71,7 +76,13 @@ namespace PhoneCtrl
             if (_hotKeys == null) return;
             var s = _app.Settings;
             _hotKeys.Register(s.HotKeys);
+
             s.HotKeys.TryGetValue(nameof(PhoneAction.Lock), out var lockKey);
+            s.HotKeys.TryGetValue(nameof(PhoneAction.MouseToPhone), out var mouseKey);
+            MouseToPhoneButton.ToolTip = "Use your mouse and keyboard on the iPhone"
+                + (string.IsNullOrEmpty(mouseKey) ? "" : $" ({mouseKey})")
+                + $"\nPress {s.CaptureExitKey} to bring them back to the PC.";
+
             HotkeyHint.Text = string.IsNullOrEmpty(lockKey) ? "" : $"Quick lock: {lockKey}";
             if (_hotKeys.Failures.Count > 0)
                 HotkeyHint.Text += "\n⚠ " + string.Join("\n⚠ ", _hotKeys.Failures);
@@ -85,14 +96,47 @@ namespace PhoneCtrl
                 _ = RunAction(action);
         }
 
-        private async System.Threading.Tasks.Task RunAction(PhoneAction action)
+        private async Task RunAction(PhoneAction action)
         {
             if (!_phone.IsConnected)
             {
                 Flash("Connect your iPhone first");
                 return;
             }
+            if (action == PhoneAction.MouseToPhone)
+            {
+                SetExpanded(false);
+                if (!_app.StartCapture()) Flash("Couldn't take over the mouse");
+                return;
+            }
             await _actions.RunAsync(action);
+        }
+
+        /// <summary>Mouse wheel over the video pad: wheel down = next video, wheel up = previous.</summary>
+        private void OnVideoPadWheel(object sender, MouseWheelEventArgs e)
+        {
+            e.Handled = true;
+            // One swipe per wheel "flick", so a fast scroll doesn't skip five videos.
+            if (DateTime.UtcNow - _lastWheelSwipe < TimeSpan.FromMilliseconds(450)) return;
+            _lastWheelSwipe = DateTime.UtcNow;
+
+            bool next = e.Delta < 0;
+            PulseArrow(next ? NextVideoButton : PrevVideoButton);
+            _ = RunAction(next ? PhoneAction.NextVideo : PhoneAction.PreviousVideo);
+        }
+
+        private void PulseArrow(Button arrow)
+        {
+            arrow.Foreground = Brushes.White;
+            arrow.Background = MakeBrush("#0078D4");
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
+            t.Tick += (_, _) =>
+            {
+                t.Stop();
+                arrow.ClearValue(ForegroundProperty);
+                arrow.ClearValue(BackgroundProperty);
+            };
+            t.Start();
         }
 
         private void Flash(string message)
@@ -112,6 +156,12 @@ namespace PhoneCtrl
 
         // ------------------------------------------------------------------ status
 
+        public void SetCaptureActive(bool active)
+        {
+            _captureActive = active;
+            ShowState(_phone.State, _phone.Detail);
+        }
+
         private void ShowState(PeripheralState state, string detail)
         {
             string color = state switch
@@ -121,6 +171,11 @@ namespace PhoneCtrl
                 PeripheralState.Error => "#E74C3C",
                 _ => "#8A8A8A",
             };
+            if (_captureActive && state == PeripheralState.Connected)
+            {
+                color = "#4CC2FF";
+                detail = $"Mouse on iPhone ({_app.Settings.CaptureExitKey})";
+            }
             StatusDot.Fill = MakeBrush(color);
             HandleDot.Fill = MakeBrush(color);
             StatusText.Text = string.IsNullOrEmpty(detail) ? state.ToString() : detail;
@@ -153,6 +208,36 @@ namespace PhoneCtrl
             Handle.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
         }
 
+        // ------------------------------------------------------------------ layout (portrait / landscape)
+
+        private bool Horizontal => _edge == DockEdge.Top || _edge == DockEdge.Bottom;
+
+        private void ApplyOrientation()
+        {
+            if (Horizontal)
+            {
+                Handle.Width = 80;
+                Handle.Height = 16;
+                Sections.Orientation = Orientation.Horizontal;
+                MusicSection.Width = 150;
+                VolumeSection.Width = 104;
+                VideoSection.Width = 104;
+                LockSection.Width = 140;
+                foreach (FrameworkElement s in Sections.Children) s.Margin = new Thickness(0, 0, 6, 0);
+            }
+            else
+            {
+                Handle.Width = 16;
+                Handle.Height = 80;
+                Sections.Orientation = Orientation.Vertical;
+                foreach (FrameworkElement s in Sections.Children)
+                {
+                    s.Width = 168;
+                    s.Margin = new Thickness(0);
+                }
+            }
+        }
+
         // ------------------------------------------------------------------ position
 
         private void OnDragStart(object sender, MouseButtonEventArgs e)
@@ -172,11 +257,19 @@ namespace PhoneCtrl
                 _dragging = false;
             }
 
-            // Snap to whichever side of this monitor is closer.
-            var wa = WorkAreaAt(Left + ActualWidth / 2, Top + ActualHeight / 2);
-            _rightEdge = Left + ActualWidth / 2 > wa.Left + wa.Width / 2;
-            _edgeX = _rightEdge ? wa.Right : wa.Left;
-            _centerY = Top + ActualHeight / 2;
+            // Snap to whichever edge of this monitor is closest.
+            var center = new Point(Left + ActualWidth / 2, Top + ActualHeight / 2);
+            var wa = WorkAreaAt(center);
+            double dLeft = center.X - wa.Left, dRight = wa.Right - center.X;
+            double dTop = center.Y - wa.Top, dBottom = wa.Bottom - center.Y;
+            double min = Math.Min(Math.Min(dLeft, dRight), Math.Min(dTop, dBottom));
+            _edge = min == dLeft ? DockEdge.Left
+                : min == dRight ? DockEdge.Right
+                : min == dTop ? DockEdge.Top
+                : DockEdge.Bottom;
+            _anchor = center;
+            ApplyOrientation();
+            UpdateLayout();
             Place();
             SavePosition();
         }
@@ -184,47 +277,48 @@ namespace PhoneCtrl
         private void LoadPosition()
         {
             var s = _app.Settings;
-            _rightEdge = !string.Equals(s.Edge, "Left", StringComparison.OrdinalIgnoreCase);
+            if (!Enum.TryParse(s.Edge, true, out _edge)) _edge = DockEdge.Right;
             var primary = SystemParameters.WorkArea;
-            _edgeX = s.EdgeX ?? (_rightEdge ? primary.Right : primary.Left);
-            _centerY = s.CenterY ?? primary.Top + primary.Height / 2;
-
-            // If the saved monitor is gone, fall back to the primary screen.
-            var wa = WorkAreaAt(_rightEdge ? _edgeX - 1 : _edgeX + 1, _centerY);
-            if (Math.Abs((_rightEdge ? wa.Right : wa.Left) - _edgeX) > 2)
-            {
-                _edgeX = _rightEdge ? primary.Right : primary.Left;
-                _centerY = primary.Top + primary.Height / 2;
-            }
-            Left = _rightEdge ? _edgeX - 16 : _edgeX;
-            Top = _centerY - 40;
+            _anchor = s.AnchorX.HasValue && s.AnchorY.HasValue
+                ? new Point(s.AnchorX.Value, s.AnchorY.Value)
+                : new Point(primary.Left + primary.Width / 2, primary.Top + primary.Height / 2);
+            ApplyOrientation();
+            Left = _anchor.X;
+            Top = _anchor.Y;
         }
 
         public void SavePosition()
         {
             var s = _app.Settings;
-            s.Edge = _rightEdge ? "Right" : "Left";
-            s.EdgeX = _edgeX;
-            s.CenterY = _centerY;
+            s.Edge = _edge.ToString();
+            s.AnchorX = _anchor.X;
+            s.AnchorY = _anchor.Y;
             s.Save();
         }
 
-        /// <summary>Keep the widget glued to its edge and vertically centred on its saved point.</summary>
+        /// <summary>Keep the widget glued to its edge, centred on its saved spot along that edge.</summary>
         private void Place()
         {
-            if (double.IsNaN(_edgeX) || ActualWidth <= 0) return;
-            var wa = WorkAreaAt(_rightEdge ? _edgeX - 1 : _edgeX + 1, _centerY);
-            Left = _rightEdge ? _edgeX - ActualWidth : _edgeX;
-            double top = _centerY - ActualHeight / 2;
-            Top = Math.Max(wa.Top, Math.Min(top, wa.Bottom - ActualHeight));
+            if (double.IsNaN(_anchor.X) || ActualWidth <= 0) return;
+            var wa = WorkAreaAt(_anchor);
+            double w = ActualWidth, h = ActualHeight;
+            double x = Math.Max(wa.Left, Math.Min(_anchor.X - w / 2, wa.Right - w));
+            double y = Math.Max(wa.Top, Math.Min(_anchor.Y - h / 2, wa.Bottom - h));
+            switch (_edge)
+            {
+                case DockEdge.Left: Left = wa.Left; Top = y; break;
+                case DockEdge.Right: Left = wa.Right - w; Top = y; break;
+                case DockEdge.Top: Top = wa.Top; Left = x; break;
+                case DockEdge.Bottom: Top = wa.Bottom - h; Left = x; break;
+            }
         }
 
-        /// <summary>Work area (screen minus taskbar) of the monitor at a point, in WPF units.</summary>
-        private Rect WorkAreaAt(double x, double y)
+        /// <summary>Work area (screen minus taskbar) of the monitor nearest a point, in WPF units.</summary>
+        private Rect WorkAreaAt(Point p)
         {
             var dpi = VisualTreeHelper.GetDpi(this);
             var screen = System.Windows.Forms.Screen.FromPoint(
-                new System.Drawing.Point((int)(x * dpi.DpiScaleX), (int)(y * dpi.DpiScaleY)));
+                new System.Drawing.Point((int)(p.X * dpi.DpiScaleX), (int)(p.Y * dpi.DpiScaleY)));
             var wa = screen.WorkingArea;
             return new Rect(wa.Left / dpi.DpiScaleX, wa.Top / dpi.DpiScaleY,
                 wa.Width / dpi.DpiScaleX, wa.Height / dpi.DpiScaleY);

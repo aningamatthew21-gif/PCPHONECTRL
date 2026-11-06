@@ -53,6 +53,9 @@ namespace PhoneCtrl.Ble
         public string Detail { get; private set; } = "";
         public bool IsConnected => State == PeripheralState.Connected;
 
+        /// <summary>Bluetooth name of the connected phone, e.g. "Matthew's iPhone".</summary>
+        public string? ConnectedDeviceName { get; private set; }
+
         /// <summary>Raised on a background thread whenever <see cref="State"/> changes.</summary>
         public event Action<PeripheralState, string>? StateChanged;
 
@@ -124,6 +127,7 @@ namespace PhoneCtrl.Ble
             _hid = null;
             _battery = null;
             _keyboardIn = _mouseIn = _consumerIn = null;
+            ConnectedDeviceName = null;
             SetState(PeripheralState.Stopped, "Stopped");
         }
 
@@ -175,6 +179,51 @@ namespace PhoneCtrl.Ble
         {
             await NotifyAsync(_keyboardIn, new byte[] { modifiers, 0, usage, 0, 0, 0, 0, 0 });
             await NotifyAsync(_keyboardIn, new byte[8]);
+        });
+
+        /// <summary>Send one raw mouse report (used by "mouse on iPhone" mode).</summary>
+        public Task SendMouseAsync(byte buttons, int dx, int dy, int wheel) => RunAsync(async () =>
+        {
+            // Large movements are split so every report stays within the ±127 range.
+            do
+            {
+                int sx = Math.Clamp(dx, -127, 127);
+                int sy = Math.Clamp(dy, -127, 127);
+                int sw = Math.Clamp(wheel, -127, 127);
+                await NotifyAsync(_mouseIn, MouseReport(buttons, sx, sy, sw));
+                dx -= sx;
+                dy -= sy;
+                wheel -= sw;
+            } while (dx != 0 || dy != 0 || wheel != 0);
+        });
+
+        /// <summary>Send one raw keyboard report: modifier bits + up to 6 pressed key usages.</summary>
+        public Task SendKeyboardAsync(byte modifiers, IReadOnlyList<byte> keys) => RunAsync(async () =>
+        {
+            var report = new byte[8];
+            report[0] = modifiers;
+            for (int i = 0; i < keys.Count && i < 6; i++) report[2 + i] = keys[i];
+            await NotifyAsync(_keyboardIn, report);
+        });
+
+        /// <summary>
+        /// Finger-style swipe with the AssistiveTouch pointer: press, drag vertically, release,
+        /// then move the pointer back to where it started. Negative = swipe up (next video).
+        /// </summary>
+        public Task SwipeAsync(int totalDy, int steps) => RunAsync(async () =>
+        {
+            steps = Math.Max(2, steps);
+            int per = Math.Clamp(totalDy / steps, -127, 127);
+            if (per == 0) per = totalDy < 0 ? -1 : 1;
+
+            await NotifyAsync(_mouseIn, MouseReport(0, 1, 0, 0));   // wake the pointer
+            await NotifyAsync(_mouseIn, MouseReport(0, -1, 0, 0));
+            await NotifyAsync(_mouseIn, MouseReport(1, 0, 0, 0));   // finger down
+            for (int i = 0; i < steps; i++)
+                await NotifyAsync(_mouseIn, MouseReport(1, 0, per, 0));
+            await NotifyAsync(_mouseIn, MouseReport(0, 0, 0, 0));   // finger up
+            for (int i = 0; i < steps; i++)
+                await NotifyAsync(_mouseIn, MouseReport(0, 0, -per, 0)); // pointer back
         });
 
         // ------------------------------------------------------------------ GATT construction
@@ -345,9 +394,39 @@ namespace PhoneCtrl.Ble
                 if (c.SubscribedClients.Count > 0) { connected = true; break; }
 
             if (connected)
-                SetState(PeripheralState.Connected, "iPhone connected");
+            {
+                SetState(PeripheralState.Connected, $"{ConnectedDeviceName ?? "iPhone"} connected");
+                if (ConnectedDeviceName == null) _ = ResolveDeviceNameAsync();
+            }
             else
+            {
+                ConnectedDeviceName = null;
                 SetState(PeripheralState.Advertising, "Waiting for iPhone…");
+            }
+        }
+
+        private async Task ResolveDeviceNameAsync()
+        {
+            try
+            {
+                foreach (var c in _inputs)
+                {
+                    if (c.SubscribedClients.Count == 0) continue;
+                    var id = c.SubscribedClients[0].Session.DeviceId.Id;
+                    using var device = await BluetoothLEDevice.FromIdAsync(id);
+                    if (device != null && !string.IsNullOrWhiteSpace(device.Name))
+                    {
+                        ConnectedDeviceName = device.Name;
+                        if (State == PeripheralState.Connected)
+                            SetState(PeripheralState.Connected, $"{device.Name} connected");
+                    }
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not read phone name", ex);
+            }
         }
 
         private void SetState(PeripheralState state, string detail)

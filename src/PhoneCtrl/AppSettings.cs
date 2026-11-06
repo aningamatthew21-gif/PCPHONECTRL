@@ -13,18 +13,27 @@ namespace PhoneCtrl
     public sealed class AppSettings
     {
         // ---- Widget position ----
-        /// <summary>"Left" or "Right" screen edge the widget is docked to.</summary>
+        /// <summary>Screen edge the widget is docked to: "Left", "Right", "Top" or "Bottom".</summary>
         public string Edge { get; set; } = "Right";
-        /// <summary>X coordinate (DIPs) of the edge the widget is docked to. null = primary screen.</summary>
-        public double? EdgeX { get; set; }
-        /// <summary>Vertical centre of the widget (DIPs). null = middle of the screen.</summary>
-        public double? CenterY { get; set; }
+        /// <summary>A point (WPF units) on the monitor the widget lives on; also where along the edge it sits.</summary>
+        public double? AnchorX { get; set; }
+        public double? AnchorY { get; set; }
 
         // ---- Feed scrolling (TikTok / Reels / Shorts) ----
-        /// <summary>Mouse-wheel notches sent for one "next/previous video" click.</summary>
+        /// <summary>"Swipe" (drag with the pointer, like a finger) or "Wheel" (mouse-wheel scroll).</summary>
+        public string ScrollMethod { get; set; } = "Swipe";
+        /// <summary>How far one swipe drags the pointer (mouse counts). Raise it if a swipe doesn't change the video.</summary>
+        public int SwipeDistance { get; set; } = 400;
+        /// <summary>Number of steps the swipe is split into. Fewer = faster flick.</summary>
+        public int SwipeSteps { get; set; } = 8;
+        /// <summary>Mouse-wheel notches per click (only for ScrollMethod "Wheel").</summary>
         public int ScrollNotches { get; set; } = 1;
         /// <summary>Flip this if ▼ goes to the previous video instead of the next one.</summary>
         public bool InvertScroll { get; set; } = false;
+
+        // ---- Mouse on iPhone ----
+        /// <summary>Shortcut that brings the mouse and keyboard back to the PC.</summary>
+        public string CaptureExitKey { get; set; } = "Ctrl+Alt+Q";
 
         // ---- Lock ----
         /// <summary>"MouseButton" (AssistiveTouch custom button → Lock Screen) or "PowerKey" (experimental).</summary>
@@ -48,7 +57,8 @@ namespace PhoneCtrl
             [nameof(PhoneAction.PreviousVideo)] = "Ctrl+Alt+PageUp",
             [nameof(PhoneAction.NextTrack)] = "Ctrl+Alt+End",
             [nameof(PhoneAction.PreviousTrack)] = "Ctrl+Alt+Home",
-            [nameof(PhoneAction.PlayPause)] = "Ctrl+Alt+Space",
+            [nameof(PhoneAction.PlayPause)] = "Ctrl+Alt+P",
+            [nameof(PhoneAction.MouseToPhone)] = "Ctrl+Alt+M",
             [nameof(PhoneAction.VolumeUp)] = "Ctrl+Alt+Add",
             [nameof(PhoneAction.VolumeDown)] = "Ctrl+Alt+Subtract",
         };
@@ -75,7 +85,11 @@ namespace PhoneCtrl
                 if (File.Exists(FilePath))
                 {
                     var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath), JsonOptions);
-                    if (s != null) return s;
+                    if (s != null)
+                    {
+                        s.Upgrade();
+                        return s;
+                    }
                 }
             }
             catch (Exception ex)
@@ -85,6 +99,18 @@ namespace PhoneCtrl
             var defaults = new AppSettings();
             defaults.Save();
             return defaults;
+        }
+
+        /// <summary>Adds shortcuts introduced in newer versions and fixes known-bad old defaults.</summary>
+        private void Upgrade()
+        {
+            var defaults = new AppSettings().HotKeys;
+            foreach (var pair in defaults)
+                if (!HotKeys.ContainsKey(pair.Key)) HotKeys[pair.Key] = pair.Value;
+            // Ctrl+Alt+Space clashes with other apps on many PCs.
+            if (HotKeys.TryGetValue(nameof(PhoneAction.PlayPause), out var pp) && pp == "Ctrl+Alt+Space")
+                HotKeys[nameof(PhoneAction.PlayPause)] = "Ctrl+Alt+P";
+            Save();
         }
 
         public void Save()

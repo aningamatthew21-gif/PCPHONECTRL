@@ -7,7 +7,8 @@ Hover over it to open it, then click to:
 |---|---|
 | ⏮ ⏯ ⏭ | Previous song · play/pause · next song (Spotify, Apple Music, YouTube Music, …) |
 | 🔉 🔊 | Volume down / up |
-| ▲ ▼ | Previous / next video in TikTok, Instagram Reels, YouTube Shorts |
+| ∧ ∨ pad | Previous / next video in TikTok, Instagram Reels, YouTube Shorts. Click an arrow **or scroll your mouse wheel over the pad** |
+| 🖱 (top-right of the panel) | **Use your mouse and keyboard on the iPhone**. Press **Ctrl + Alt + Q** to bring them back |
 | 🔒 Lock phone | Locks the phone, so the screen goes black |
 
 No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be a
@@ -36,7 +37,8 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 
 ## First-time setup
 
-1. **Close BleHid** if it's running. Only one app at a time can be the Bluetooth keyboard.
+1. **You don't need BleHid any more.** PhoneCtrl has its own Bluetooth connection. If BleHid is running,
+   PhoneCtrl offers to close it, because only one app at a time can be the Bluetooth keyboard.
 2. On the iPhone: **Settings → Bluetooth** → tap ⓘ next to your PC → **Forget This Device**.
    This is required once, because PhoneCtrl adds media keys and the phone has to learn the new layout.
 3. Start **PhoneCtrl.exe**. A slim tab appears on the right edge of the screen. Its dot shows the status:
@@ -46,7 +48,8 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 6. Set up the lock button:
    **AssistiveTouch → Pointer Devices → Devices → (your PC) → Customize Additional Buttons…**
    When it asks you to press a button, click **🔒 Lock phone** in the widget, then choose **Lock Screen**.
-7. Open TikTok/Reels and try ▼. If it goes the wrong way, see *Settings* below.
+7. Click 🖱 in the panel, move the phone's pointer over the video, press **Ctrl + Alt + Q**, then try ∨.
+   The pad sends a finger-style swipe at the pointer's position. If it goes the wrong way, see *Settings* below.
 
 ## Keyboard shortcuts (work from any app)
 
@@ -55,16 +58,20 @@ No dongle, no Wi-Fi, no app on the phone. Your PC's own Bluetooth pretends to be
 | **Ctrl + Alt + L** | Lock phone (boss key) |
 | Ctrl + Alt + PageDown / PageUp | Next / previous video |
 | Ctrl + Alt + End / Home | Next / previous song |
-| Ctrl + Alt + Space | Play / pause |
+| Ctrl + Alt + P | Play / pause |
+| **Ctrl + Alt + M** | Mouse and keyboard → iPhone |
+| **Ctrl + Alt + Q** | Mouse and keyboard back to the PC |
 | Ctrl + Alt + Num+ / Num− | Volume up / down |
 
 ## Using the widget
 
 * **Hover** the tab to open it. Move away and it closes.
-* **Drag** the tab (or the panel's top row) to move it. It snaps to the nearest left/right edge and works on any monitor.
+* **Drag** the tab (or the panel's top row) to move it. It snaps to the nearest edge (left, right, top or bottom)
+  of any monitor. On the top or bottom edge it lays out sideways (landscape).
 * **Tray icon** (near the clock): show/hide the widget, restart Bluetooth, open settings or logs, exit.
-* The ⌖ button in the panel's top row moves the phone's pointer to the middle of the screen
-  (scrolling acts on whatever is under the pointer).
+* **Mouse on iPhone:** while it's active, a blue banner at the top of the screen reminds you how to get back.
+  Your PC cursor freezes, and the mouse, clicks, scroll wheel and keyboard all go to the phone
+  (the Windows key acts as ⌘). If the phone disconnects, the mouse returns automatically.
 
 ## Settings
 
@@ -72,11 +79,14 @@ Tray icon → **Open settings file**, edit, save, then tray icon → **Reload se
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `ScrollNotches` | `1` | Wheel notches per ▲/▼ click. Raise it if a video doesn't change. |
-| `InvertScroll` | `false` | Set to `true` if ▼ goes to the *previous* video. |
+| `ScrollMethod` | `"Swipe"` | `"Swipe"` drags like a finger; `"Wheel"` sends scroll-wheel notches. |
+| `SwipeDistance` | `400` | How far a swipe drags. Raise it if the video doesn't change. |
+| `SwipeSteps` | `8` | Fewer steps = faster flick. |
+| `ScrollNotches` | `1` | Wheel notches per click (`"Wheel"` method only). |
+| `InvertScroll` | `false` | Set to `true` if ∨ goes to the *previous* video. |
+| `CaptureExitKey` | `"Ctrl+Alt+Q"` | Shortcut that brings the mouse back to the PC. |
 | `LockMethod` | `"MouseButton"` | `"PowerKey"` tries a media power key instead (experimental). |
 | `LockMouseButton` | `3` | Mouse button sent for lock (must match your AssistiveTouch mapping). |
-| `CenterOffsetX/Y` | `200` / `400` | Tune the ⌖ "center pointer" position. |
 | `HotKeys` | see above | Change or clear (`""`) any shortcut. |
 
 ## Troubleshooting
@@ -93,11 +103,12 @@ in-box Windows `GattServiceProvider` API. The HID report map (`Ble/HidReports.cs
 a 5-button mouse with wheel, and consumer-control media keys. Widget buttons send:
 
 * media keys → Next/Previous Track, Play/Pause, Volume (consumer page usages 0xB5, 0xB6, 0xCD, 0xE9, 0xEA)
-* ▲/▼ → mouse wheel
+* ∧/∨ → a press-drag-release swipe with the AssistiveTouch pointer
+* mouse on iPhone → low-level Windows mouse/keyboard hooks (`InputCapture.cs`) forward input as HID reports
 * Lock → a mouse button press that AssistiveTouch maps to *Lock Screen*
 
 ## Roadmap ideas
 
-* Mouse pass-through: move the PC mouse past the screen edge onto the phone
+* Edge crossing: push the PC mouse past a screen edge to jump onto the phone
 * In-app settings screen and custom buttons
 * Mac / Linux versions of the widget
