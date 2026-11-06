@@ -143,20 +143,40 @@ namespace PhoneCtrl
             return exe;
         }
 
-        /// <summary>Starts the new version, which waits for this process to exit first.</summary>
-        public static void Restart(string exe)
+        /// <summary>Starts the new version (like a double-click). It must not wait for us: we're watching it.</summary>
+        public static Process? StartNewVersion(string exe)
         {
-            Process.Start(new ProcessStartInfo(exe)
+            return Process.Start(new ProcessStartInfo(exe)
             {
-                UseShellExecute = false,
-                Arguments = $"--after-update {Environment.ProcessId}",
+                UseShellExecute = true,
+                Arguments = "--updated",
+                WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
             });
         }
 
-        /// <summary>Called at startup: removes the previous version's leftover file.</summary>
+        /// <summary>The new version didn't start: put the previous exe back.</summary>
+        public static void RollBack()
+        {
+            var exe = ExePath;
+            if (!File.Exists(OldExePath)) return;
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                try
+                {
+                    if (File.Exists(exe)) File.Delete(exe);
+                    File.Move(OldExePath, exe);
+                    Log.Info("Rolled back to the previous version");
+                    return;
+                }
+                catch (IOException) { System.Threading.Thread.Sleep(250); }
+                catch (UnauthorizedAccessException) { System.Threading.Thread.Sleep(250); }
+            }
+        }
+
+        /// <summary>Called at startup: removes the previous version's leftover files (retries while it is still closing).</summary>
         public static void CleanUp()
         {
-            for (int attempt = 0; attempt < 10; attempt++)
+            for (int attempt = 0; attempt < 60; attempt++)
             {
                 try
                 {

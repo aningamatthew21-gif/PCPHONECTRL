@@ -53,7 +53,8 @@ namespace PhoneCtrl
             _messageTimer.Tick += (_, _) => { _messageTimer.Stop(); ShowState(_phone.State, _phone.Detail); };
 
             _phone.StateChanged += (state, detail) => Dispatcher.InvokeAsync(() => ShowState(state, detail));
-            SizeChanged += (_, _) => Place();
+            SizeChanged += (_, _) => Dispatcher.BeginInvoke(new Action(Place), DispatcherPriority.Loaded);
+            DpiChanged += (_, _) => Dispatcher.BeginInvoke(new Action(Place), DispatcherPriority.Loaded);
             ShowState(_phone.State, _phone.Detail);
             LoadPosition();
         }
@@ -334,6 +335,22 @@ namespace PhoneCtrl
         }
 
         // ------------------------------------------------------------------ position
+        //
+        // All positioning is done in physical screen pixels with Win32 calls. WPF's own Left/Top are in
+        // DPI-scaled units, which change meaning when the window crosses onto a monitor with a different
+        // scale. Mixing the two caused a resize → re-snap → resize loop that froze the app.
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        private const uint SWP_NOSIZE = 0x0001, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010;
+
+        private bool _placing;
+
+        private IntPtr Hwnd => new WindowInteropHelper(this).Handle;
 
         private void OnDragStart(object sender, MouseButtonEventArgs e)
         {
@@ -352,20 +369,21 @@ namespace PhoneCtrl
                 _dragging = false;
             }
 
-            // Snap to whichever edge of this monitor is closest.
-            var center = new Point(Left + ActualWidth / 2, Top + ActualHeight / 2);
-            var wa = WorkAreaAt(center);
-            double dLeft = center.X - wa.Left, dRight = wa.Right - center.X;
-            double dTop = center.Y - wa.Top, dBottom = wa.Bottom - center.Y;
-            double min = Math.Min(Math.Min(dLeft, dRight), Math.Min(dTop, dBottom));
+            if (!GetWindowRect(Hwnd, out var r)) return;
+            var center = new System.Drawing.Point((r.Left + r.Right) / 2, (r.Top + r.Bottom) / 2);
+            var wa = System.Windows.Forms.Screen.FromPoint(center).WorkingArea;
+
+            // Snap to whichever edge of the monitor it was dropped on is closest.
+            int dLeft = center.X - wa.Left, dRight = wa.Right - center.X;
+            int dTop = center.Y - wa.Top, dBottom = wa.Bottom - center.Y;
+            int min = Math.Min(Math.Min(dLeft, dRight), Math.Min(dTop, dBottom));
             _edge = min == dLeft ? DockEdge.Left
                 : min == dRight ? DockEdge.Right
                 : min == dTop ? DockEdge.Top
                 : DockEdge.Bottom;
-            _anchor = center;
+            _anchor = new Point(center.X, center.Y);
             ApplyOrientation();
-            UpdateLayout();
-            Place();
+            Dispatcher.BeginInvoke(new Action(Place), DispatcherPriority.Loaded);
             SavePosition();
         }
 
@@ -373,13 +391,11 @@ namespace PhoneCtrl
         {
             var s = _app.Settings;
             if (!Enum.TryParse(s.Edge, true, out _edge)) _edge = DockEdge.Right;
-            var primary = SystemParameters.WorkArea;
+            var primary = System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
             _anchor = s.AnchorX.HasValue && s.AnchorY.HasValue
                 ? new Point(s.AnchorX.Value, s.AnchorY.Value)
                 : new Point(primary.Left + primary.Width / 2, primary.Top + primary.Height / 2);
             ApplyOrientation();
-            Left = _anchor.X;
-            Top = _anchor.Y;
         }
 
         public void SavePosition()
@@ -391,32 +407,39 @@ namespace PhoneCtrl
             s.Save();
         }
 
-        /// <summary>Keep the widget glued to its edge, centred on its saved spot along that edge.</summary>
+        /// <summary>Keep the widget glued to its edge (in screen pixels), centred on its saved spot along that edge.</summary>
         private void Place()
         {
-            if (double.IsNaN(_anchor.X) || ActualWidth <= 0) return;
-            var wa = WorkAreaAt(_anchor);
-            double w = ActualWidth, h = ActualHeight;
-            double x = Math.Max(wa.Left, Math.Min(_anchor.X - w / 2, wa.Right - w));
-            double y = Math.Max(wa.Top, Math.Min(_anchor.Y - h / 2, wa.Bottom - h));
-            switch (_edge)
-            {
-                case DockEdge.Left: Left = wa.Left; Top = y; break;
-                case DockEdge.Right: Left = wa.Right - w; Top = y; break;
-                case DockEdge.Top: Top = wa.Top; Left = x; break;
-                case DockEdge.Bottom: Top = wa.Bottom - h; Left = x; break;
-            }
-        }
+            if (_dragging || _placing || double.IsNaN(_anchor.X)) return;
+            var hwnd = Hwnd;
+            if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r)) return;
 
-        /// <summary>Work area (screen minus taskbar) of the monitor nearest a point, in WPF units.</summary>
-        private Rect WorkAreaAt(Point p)
-        {
-            var dpi = VisualTreeHelper.GetDpi(this);
-            var screen = System.Windows.Forms.Screen.FromPoint(
-                new System.Drawing.Point((int)(p.X * dpi.DpiScaleX), (int)(p.Y * dpi.DpiScaleY)));
-            var wa = screen.WorkingArea;
-            return new Rect(wa.Left / dpi.DpiScaleX, wa.Top / dpi.DpiScaleY,
-                wa.Width / dpi.DpiScaleX, wa.Height / dpi.DpiScaleY);
+            _placing = true;
+            try
+            {
+                int w = r.Right - r.Left, h = r.Bottom - r.Top;
+                if (w <= 0 || h <= 0) return;
+                var wa = System.Windows.Forms.Screen.FromPoint(
+                    new System.Drawing.Point((int)_anchor.X, (int)_anchor.Y)).WorkingArea;
+
+                int ax = (int)_anchor.X, ay = (int)_anchor.Y;
+                int x = Math.Max(wa.Left, Math.Min(ax - w / 2, wa.Right - w));
+                int y = Math.Max(wa.Top, Math.Min(ay - h / 2, wa.Bottom - h));
+                switch (_edge)
+                {
+                    case DockEdge.Left: x = wa.Left; break;
+                    case DockEdge.Right: x = wa.Right - w; break;
+                    case DockEdge.Top: y = wa.Top; break;
+                    case DockEdge.Bottom: y = wa.Bottom - h; break;
+                }
+
+                if (x != r.Left || y != r.Top)
+                    SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            finally
+            {
+                _placing = false;
+            }
         }
 
         protected override void OnClosed(EventArgs e)

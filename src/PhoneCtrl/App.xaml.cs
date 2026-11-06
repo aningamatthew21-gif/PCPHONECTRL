@@ -25,14 +25,33 @@ namespace PhoneCtrl
         {
             base.OnStartup(e);
 
-            // After a self-update, the new version waits here for the old one to close.
+            // Started by an older updater (v0.3.5-0.3.7): wait for that copy to close first.
             Updater.WaitForPreviousInstance(e.Args);
 
-            _singleInstance = new Mutex(true, @"Local\PhoneCtrl.SingleInstance", out bool isFirst);
+            Log.Info($"PhoneCtrl {Updater.CurrentVersion} launched with args: [{string.Join(" ", e.Args)}]");
+            bool afterUpdate = Array.IndexOf(e.Args, "--updated") >= 0 || Array.IndexOf(e.Args, "--after-update") >= 0;
+
+            // Only one copy may run (two would publish the same Bluetooth service).
+            // Right after an update the previous copy may still be closing, so wait for it.
+            _singleInstance = new Mutex(false, @"Local\PhoneCtrl.SingleInstance");
+            bool isFirst;
+            try
+            {
+                isFirst = _singleInstance.WaitOne(afterUpdate ? TimeSpan.FromSeconds(30) : TimeSpan.Zero);
+            }
+            catch (AbandonedMutexException)
+            {
+                isFirst = true; // previous copy exited without cleaning up
+            }
             if (!isFirst)
             {
-                MessageBox.Show("PhoneCtrl is already running (look for its icon near the clock).",
-                    "PhoneCtrl", MessageBoxButton.OK, MessageBoxImage.Information);
+                Log.Info("Another copy is already running; exiting");
+                MessageBox.Show("PhoneCtrl is already running.\n\nLook for the widget on the edge of your screen, " +
+                    "or the blue phone icon near the clock (click ^ if it's hidden).",
+                    "PhoneCtrl", MessageBoxButton.OK, MessageBoxImage.Information,
+                    MessageBoxResult.OK, MessageBoxOptions.DefaultDesktopOnly);
+                _singleInstance.Dispose();
+                _singleInstance = null;
                 Shutdown();
                 return;
             }
@@ -46,6 +65,7 @@ namespace PhoneCtrl
                 Log.Error("Unhandled exception", args.ExceptionObject as Exception);
 
             Log.Info($"PhoneCtrl {Updater.CurrentVersion} starting");
+            if (afterUpdate) Log.Info("Started after an update");
             Settings = AppSettings.Load();
 
             _phone = new HidPeripheral { ReportIntervalMs = Settings.ReportIntervalMs };
@@ -152,6 +172,27 @@ namespace PhoneCtrl
 
         public bool HasPendingUpdate => _pendingUpdate != null;
 
+        private void ReleaseSingleInstance()
+        {
+            try
+            {
+                _singleInstance?.ReleaseMutex();
+            }
+            catch (ApplicationException)
+            {
+                // Not owned (shouldn't happen).
+            }
+            _singleInstance?.Dispose();
+            _singleInstance = null;
+        }
+
+        private void ReacquireSingleInstance()
+        {
+            _singleInstance = new Mutex(false, @"Local\PhoneCtrl.SingleInstance");
+            try { _singleInstance.WaitOne(TimeSpan.FromSeconds(5)); }
+            catch (AbandonedMutexException) { }
+        }
+
         public async void InstallUpdate()
         {
             if (_pendingUpdate == null || _installing) return;
@@ -162,8 +203,28 @@ namespace PhoneCtrl
                 _widget?.ShowUpdateProgress("Downloading…");
                 var exe = await _updater.DownloadAndSwapAsync(_pendingUpdate, progress);
                 _widget?.ShowUpdateProgress("Restarting…");
-                Updater.Restart(exe);
-                Quit();
+
+                // Hand over cleanly: free Bluetooth and the single-instance lock BEFORE the new copy starts.
+                _capture?.Stop();
+                _phone?.Stop();
+                ReleaseSingleInstance();
+
+                var proc = Updater.StartNewVersion(exe);
+                Log.Info($"Started new version (pid {proc?.Id})");
+
+                // If the new copy dies within 10 s, it didn't start properly: undo and keep this one running.
+                bool exitedEarly = proc == null || await System.Threading.Tasks.Task.Run(() => proc.WaitForExit(10000));
+                if (!exitedEarly)
+                {
+                    Quit();
+                    return;
+                }
+
+                Log.Error($"New version exited early (code {(proc != null ? proc.ExitCode.ToString() : "n/a")}); rolling back");
+                Updater.RollBack();
+                ReacquireSingleInstance();
+                if (_phone != null) _ = _phone.StartAsync();
+                throw new InvalidOperationException("The new version closed right after starting, so PhoneCtrl went back to the previous version.");
             }
             catch (Exception ex)
             {
